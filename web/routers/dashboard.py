@@ -32,4 +32,5 @@ async def dashboard_page(request: Request):
         "metrics": metrics,
         "daily_stats": daily_stats,
         "page": "dashboard",
+        "admin_path": settings.ADMIN_PATH,
     })
