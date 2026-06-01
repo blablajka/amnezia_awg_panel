@@ -1,6 +1,7 @@
 """Protocols Router — управление VPN протоколами на серверах."""
 from __future__ import annotations
 from fastapi import APIRouter, Request, Form
+from config import settings
 from fastapi.responses import HTMLResponse, RedirectResponse
 from database.session import async_session_factory
 from database import crud
@@ -13,8 +14,6 @@ sm = ServerManager()
 
 AVAILABLE_PROTOCOLS = [
     {"id": "awg", "name": "AmneziaWG", "icon": "fa-shield-halved", "color": "brand"},
-    {"id": "hysteria2", "name": "Hysteria2", "icon": "fa-bolt", "color": "purple"},
-    {"id": "gost", "name": "GOST Relay", "icon": "fa-network-wired", "color": "amber"},
 ]
 
 
@@ -22,7 +21,7 @@ AVAILABLE_PROTOCOLS = [
 async def protocols_page(request: Request):
     token = get_session_token(request)
     if not verify_session(token):
-        return RedirectResponse("/login", status_code=302)
+        return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
     templates = request.app.state.templates
 
     async with async_session_factory() as session:
@@ -49,12 +48,12 @@ async def deploy_protocol(
 ):
     token = get_session_token(request)
     if not verify_session(token):
-        return RedirectResponse("/login", status_code=302)
+        return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
 
     async with async_session_factory() as session:
         server = await crud.get_server_by_id(session, server_id)
         if not server:
-            return RedirectResponse("/protocols?error=server_not_found", status_code=302)
+            return RedirectResponse(f"{settings.ADMIN_PATH}/protocols?error=server_not_found", status_code=302)
 
     try:
         handler = get_protocol_handler(protocol)
@@ -68,4 +67,4 @@ async def deploy_protocol(
     except Exception as e:
         return RedirectResponse(f"/protocols?error={str(e)[:200]}", status_code=302)
 
-    return RedirectResponse("/protocols?deployed=1", status_code=302)
+    return RedirectResponse(f"{settings.ADMIN_PATH}/protocols?deployed=1", status_code=302)

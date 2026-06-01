@@ -1,6 +1,7 @@
 """Stats Router — страница статистики."""
 from __future__ import annotations
 from fastapi import APIRouter, Request
+from config import settings
 from fastapi.responses import HTMLResponse, RedirectResponse
 from database.session import async_session_factory
 from database import crud
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 async def stats_page(request: Request):
     token = get_session_token(request)
     if not verify_session(token):
-        return RedirectResponse("/login", status_code=302)
+        return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
     templates = request.app.state.templates
     async with async_session_factory() as session:
         metrics = await StatsService.get_dashboard_metrics(session)

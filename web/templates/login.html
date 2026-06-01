@@ -44,7 +44,7 @@
             </div>
             {% endif %}
 
-            <form method="POST" action="/login" class="space-y-5">
+            <form method="POST" action="{{ admin_path }}/login" class="space-y-5">
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-2">Логин</label>
                     <input type="text" name="username" required autocomplete="username"

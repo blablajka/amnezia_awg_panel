@@ -18,13 +18,8 @@ class Settings(BaseSettings):
     )
 
     # ── Telegram Bot ─────────────────────────────────────────────────────
-    BOT_TOKEN: str
+    BOT_TOKEN: str = "dummy_token_to_allow_startup"
     ADMIN_IDS: list[int] = []  # Telegram ID администраторов (через запятую в .env)
-
-    # ── YooKassa ─────────────────────────────────────────────────────────
-    YOOKASSA_SHOP_ID: str
-    YOOKASSA_SECRET_KEY: str
-    YOOKASSA_RETURN_URL: str = "https://t.me/your_bot"  # URL возврата после оплаты
 
     # ── Redis ──────────────────────────────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379"
@@ -35,13 +30,10 @@ class Settings(BaseSettings):
     # ── Web Admin Panel ──────────────────────────────────────────────────
     WEB_HOST: str = "0.0.0.0"
     WEB_PORT: int = 8000
+    ADMIN_PATH: str = "/admin"  # Защищенный путь к панели
     SECRET_KEY: str = "change-me-in-production-please"
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin"  # В продакшне — хэш bcrypt
-
-    # ── Webhook (для приёма уведомлений от ЮKassa) ───────────────────────
-    WEBHOOK_BASE_URL: str = "https://yourdomain.com"
-    WEBHOOK_PATH: str = "/api/yookassa/webhook"
 
     # ── Реферальная система ──────────────────────────────────────────────
     REFERRAL_BONUS_DAYS: int = 3  # Дней подписки за приглашённого друга
@@ -53,11 +45,6 @@ class Settings(BaseSettings):
     PRICE_1_MONTH: int = 290
     PRICE_3_MONTHS: int = 690
     PRICE_12_MONTHS: int = 2490
-
-    @property
-    def webhook_url(self) -> str:
-        """Полный URL webhook для ЮKassa."""
-        return f"{self.WEBHOOK_BASE_URL.rstrip('/')}{self.WEBHOOK_PATH}"
 
     @property
     def prices(self) -> dict[str, int]:

@@ -21,7 +21,7 @@ alembic>=1.13.0
 # asyncpg>=0.29.0  # Раскомментировать для PostgreSQL
 
 # ── Payments ──────────────────────────────────────────────────
-yookassa>=3.2.0
+# YooKassa removed (No longer needed)
 
 # ── Server Management ────────────────────────────────────────
 paramiko>=3.4.0

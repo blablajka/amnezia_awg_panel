@@ -21,7 +21,7 @@
     <!-- Создание моста -->
     <div class="glass rounded-2xl p-6">
         <h2 class="text-lg font-semibold text-white mb-4">Создать мост</h2>
-        <form action="/bridges/create" method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <form action="{{ admin_path }}/bridges/create" method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-3">
             <select name="server_from_id" class="bg-dark-700 border border-dark-400/30 rounded-lg px-3 py-2 text-sm text-white" required>
                 <option value="">От (русский VPS)...</option>
                 {% for s in servers %}
@@ -70,13 +70,13 @@
                     {% else %}
                     <span class="text-xs text-dark-300 bg-dark-500/20 px-2 py-1 rounded-full">Inactive</span>
                     {% endif %}
-                    <form action="/bridges/toggle" method="POST" class="inline">
+                    <form action="{{ admin_path }}/bridges/toggle" method="POST" class="inline">
                         <input type="hidden" name="bridge_id" value="{{ b.id }}">
                         <button type="submit" class="text-xs text-brand-400 hover:text-brand-300 px-2 py-1">
                             {% if b.is_active %}Disable{% else %}Enable{% endif %}
                         </button>
                     </form>
-                    <form action="/bridges/delete" method="POST" class="inline" onsubmit="return confirm('Удалить мост?')">
+                    <form action="{{ admin_path }}/bridges/delete" method="POST" class="inline" onsubmit="return confirm('Удалить мост?')">
                         <input type="hidden" name="bridge_id" value="{{ b.id }}">
                         <button type="submit" class="text-xs text-red-400 hover:text-red-300 px-2 py-1">
                             <i class="fas fa-trash"></i>

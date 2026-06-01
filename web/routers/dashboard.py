@@ -4,6 +4,7 @@ Dashboard Router — главная страница админ-панели с 
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
+from config import settings
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from database.session import async_session_factory
@@ -18,7 +19,7 @@ async def dashboard_page(request: Request):
     """Главная страница дашборда."""
     token = get_session_token(request)
     if not verify_session(token):
-        return RedirectResponse("/login", status_code=302)
+        return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
 
     templates = request.app.state.templates
 

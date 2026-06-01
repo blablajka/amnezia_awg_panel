@@ -2,6 +2,7 @@
 from __future__ import annotations
 from decimal import Decimal
 from fastapi import APIRouter, Request, Form
+from config import settings
 from fastapi.responses import HTMLResponse, RedirectResponse
 from database.session import async_session_factory
 from database import crud
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/promo-codes", tags=["promo_codes"])
 async def promo_codes_page(request: Request):
     token = get_session_token(request)
     if not verify_session(token):
-        return RedirectResponse("/login", status_code=302)
+        return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
     templates = request.app.state.templates
     async with async_session_factory() as session:
         promos = await crud.get_all_promo_codes(session)
@@ -31,11 +32,11 @@ async def create_promo(
 ):
     token = get_session_token(request)
     if not verify_session(token):
-        return RedirectResponse("/login", status_code=302)
+        return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
     async with async_session_factory() as session:
         await PromoService.create_promo(
             session=session, code=code,
             discount_percent=discount_percent, max_uses=max_uses,
         )
         await session.commit()
-    return RedirectResponse("/promo-codes", status_code=302)
+    return RedirectResponse(f"{settings.ADMIN_PATH}/promo-codes", status_code=302)

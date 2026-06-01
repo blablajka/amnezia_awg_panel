@@ -2,7 +2,7 @@
 set -e
 
 echo "================================================="
-echo "   Amnezia AWG Panel - Minimal Installer (Public)"
+echo "   Amnezia AWG Panel - Installer (Ideal)"
 echo "================================================="
 
 export DEBIAN_FRONTEND=noninteractive
@@ -10,21 +10,32 @@ export DEBIAN_FRONTEND=noninteractive
 # 1. Update and install minimal deps
 echo "=> Обновление пакетов и установка зависимостей..."
 apt-get update -y > /dev/null
-apt-get install -yq git python3 python3-venv python3-pip nginx curl jq > /dev/null
+apt-get install -yq git python3 python3-venv python3-pip nginx curl jq uuid-runtime > /dev/null
 
 # 2. Clone repository
 echo "=> Скачивание репозитория..."
 rm -rf /opt/panel
 git clone -q "https://github.com/blablajka/amnezia_awg_panel.git" /opt/panel
 
-# 3. Setup Python virtual environment
-echo "=> Настройка Python окружения..."
+# 3. Generate Secret Environment
+echo "=> Генерация секретного конфигурационного файла..."
 cd /opt/panel
+ADMIN_UUID=$(cat /proc/sys/kernel/random/uuid)
+SECRET_KEY=$(head -c 32 /dev/urandom | base64)
+
+cat > .env << ENVEOF
+BOT_TOKEN=dummy_token_to_allow_startup
+ADMIN_PATH=/$ADMIN_UUID
+SECRET_KEY=$SECRET_KEY
+ENVEOF
+
+# 4. Setup Python virtual environment
+echo "=> Настройка Python окружения..."
 python3 -m venv venv
 source venv/bin/activate
 pip install -q -r requirements.txt
 
-# 4. Create Systemd Service
+# 5. Create Systemd Service
 echo "=> Создание системной службы..."
 cat > /etc/systemd/system/amnezia-panel.service << 'EOF'
 [Unit]
@@ -45,7 +56,7 @@ EOF
 systemctl daemon-reload
 systemctl enable --now amnezia-panel
 
-# 5. Configure Nginx
+# 6. Configure Nginx
 echo "=> Настройка Nginx..."
 cat > /etc/nginx/sites-available/amnezia << 'EOF'
 server {
@@ -63,9 +74,11 @@ ln -sf /etc/nginx/sites-available/amnezia /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 systemctl restart nginx
 
-# 6. Done
+# 7. Done
 IP=$(curl -s ifconfig.me)
 echo "================================================="
 echo "✅ Установка успешно завершена!"
-echo "🌐 Адрес вашей панели: http://$IP"
+echo "🔥 ВАЖНО! СОХРАНИТЕ ЭТУ ССЫЛКУ 🔥"
+echo "🌐 Секретный адрес панели: http://$IP/$ADMIN_UUID/dashboard"
+echo "Никому не передавайте этот URL, иначе панель будет доступна извне."
 echo "================================================="

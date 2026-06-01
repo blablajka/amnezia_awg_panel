@@ -68,35 +68,35 @@
 
         <!-- Navigation -->
         <nav class="flex-1 p-4 space-y-1">
-            <a href="/dashboard" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'dashboard' %}active{% endif %}">
+            <a href="{{ admin_path }}/dashboard" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'dashboard' %}active{% endif %}">
                 <i class="fas fa-chart-line w-5 text-center"></i>Dashboard
             </a>
-            <a href="/users" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'users' %}active{% endif %}">
+            <a href="{{ admin_path }}/users" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'users' %}active{% endif %}">
                 <i class="fas fa-users w-5 text-center"></i>Пользователи
             </a>
-            <a href="/subscriptions" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'subscriptions' %}active{% endif %}">
+            <a href="{{ admin_path }}/subscriptions" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'subscriptions' %}active{% endif %}">
                 <i class="fas fa-key w-5 text-center"></i>Подписки
             </a>
-            <a href="/servers" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'servers' %}active{% endif %}">
+            <a href="{{ admin_path }}/servers" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'servers' %}active{% endif %}">
                 <i class="fas fa-server w-5 text-center"></i>Серверы
             </a>
-            <a href="/promo-codes" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'promo_codes' %}active{% endif %}">
+            <a href="{{ admin_path }}/promo-codes" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'promo_codes' %}active{% endif %}">
                 <i class="fas fa-tags w-5 text-center"></i>Промокоды
             </a>
-            <a href="/stats" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'stats' %}active{% endif %}">
+            <a href="{{ admin_path }}/stats" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'stats' %}active{% endif %}">
                 <i class="fas fa-chart-bar w-5 text-center"></i>Статистика
             </a>
-            <a href="/protocols" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'protocols' %}active{% endif %}">
+            <a href="{{ admin_path }}/protocols" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'protocols' %}active{% endif %}">
                 <i class="fas fa-plug w-5 text-center"></i>Протоколы
             </a>
-            <a href="/bridges" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'bridges' %}active{% endif %}">
+            <a href="{{ admin_path }}/bridges" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if page == 'bridges' %}active{% endif %}">
                 <i class="fas fa-network-wired w-5 text-center"></i>Мосты
             </a>
         </nav>
 
         <!-- Logout -->
         <div class="p-4 border-t border-dark-400/30">
-            <a href="/logout" class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors">
+            <a href="{{ admin_path }}/logout" class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors">
                 <i class="fas fa-sign-out-alt w-5 text-center"></i>Выйти
             </a>
         </div>
