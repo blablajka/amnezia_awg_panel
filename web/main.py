@@ -93,4 +93,48 @@ def create_web_app() -> FastAPI:
     async def startup_event():
         asyncio.create_task(cleanup_loop())
 
+    # ── Login / Logout ───────────────────────────────────────────────
+    from fastapi import Form
+    from web.auth import get_session_token, verify_session, check_credentials, create_session, delete_session
+
+    @admin_router.get("/login", response_class=HTMLResponse)
+    async def login_page(request: Request):
+        token = get_session_token(request)
+        if verify_session(token):
+            return RedirectResponse(f"{settings.ADMIN_PATH}/dashboard", status_code=302)
+        return templates.TemplateResponse("login.html", {
+            "request": request, "error": None, "admin_path": settings.ADMIN_PATH
+        })
+
+    @admin_router.post("/login")
+    async def login_submit(
+        request: Request,
+        username: str = Form(...),
+        password: str = Form(...),
+    ):
+        if check_credentials(username, password):
+            token = create_session(username)
+            response = RedirectResponse(f"{settings.ADMIN_PATH}/dashboard", status_code=302)
+            response.set_cookie(
+                "session_token", token,
+                httponly=True,
+                max_age=86400 * 7,  # 7 дней
+            )
+            return response
+
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Неверный логин или пароль",
+            "admin_path": settings.ADMIN_PATH
+        })
+
+    @admin_router.get("/logout")
+    async def logout(request: Request):
+        token = get_session_token(request)
+        if token:
+            delete_session(token)
+        response = RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
+        response.delete_cookie("session_token")
+        return response
+
     return app
