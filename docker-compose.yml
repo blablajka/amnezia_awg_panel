@@ -1,0 +1,70 @@
+version: "3.9"
+
+services:
+  # ═══════════════════════════════════════════════════════════
+  # Management Server (Bot + Web Admin + Scheduler)
+  # ═══════════════════════════════════════════════════════════
+  amnezia-manager:
+    build: .
+    container_name: amnezia-manager
+    restart: unless-stopped
+    ports:
+      - "8000:8000"       # Web Admin Panel
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data  # Persistent data (SQLite DB, logs)
+      - ./pictures:/app/pictures  # Welcome image for bot
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/vpn_system.db
+    depends_on:
+      - redis
+    networks:
+      - amnezia-net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/login', timeout=5)\" || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ═══════════════════════════════════════════════════════════
+  # Redis (для кэша и FSM storage в продакшне)
+  # ═══════════════════════════════════════════════════════════
+  redis:
+    image: redis:7-alpine
+    container_name: amnezia-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - amnezia-net
+
+  # ═══════════════════════════════════════════════════════════
+  # PostgreSQL (опционально — вместо SQLite)
+  # Раскомментируйте, если нужна полноценная СУБД
+  # ═══════════════════════════════════════════════════════════
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: amnezia-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: amnezia_vpn
+  #     POSTGRES_USER: amnezia
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   networks:
+  #     - amnezia-net
+
+volumes:
+  redis-data:
+  # postgres-data:
+
+networks:
+  amnezia-net:
+    driver: bridge

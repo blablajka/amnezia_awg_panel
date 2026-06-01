@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — Amnezia VPN Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .login-card {
+            background: rgba(37, 38, 43, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+    </style>
+</head>
+<body class="bg-[#101113] min-h-screen flex items-center justify-center">
+    <!-- Background gradient -->
+    <div class="fixed inset-0 bg-gradient-to-br from-indigo-900/20 via-transparent to-purple-900/20 pointer-events-none"></div>
+
+    <div class="relative z-10 w-full max-w-md px-6">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/25">
+                <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+                </svg>
+            </div>
+            <h1 class="text-2xl font-bold text-white">Amnezia VPN</h1>
+            <p class="text-gray-400 text-sm mt-1">Admin Panel</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="login-card rounded-2xl p-8 shadow-2xl">
+            <h2 class="text-xl font-semibold text-white mb-6">Вход в панель</h2>
+
+            {% if error %}
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-2">
+                <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="POST" action="/login" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Логин</label>
+                    <input type="text" name="username" required autocomplete="username"
+                        class="w-full px-4 py-3 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
+                        placeholder="admin">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Пароль</label>
+                    <input type="password" name="password" required autocomplete="current-password"
+                        class="w-full px-4 py-3 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
+                        placeholder="••••••••">
+                </div>
+                <button type="submit"
+                    class="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl hover:from-indigo-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all shadow-lg shadow-indigo-500/25">
+                    Войти
+                </button>
+            </form>
+        </div>
+
+        <p class="text-center text-gray-600 text-xs mt-6">
+            Amnezia VPN Admin Panel v1.0
+        </p>
+    </div>
+</body>
+</html>

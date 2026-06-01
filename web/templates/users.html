@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Пользователи — Amnezia VPN Admin{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Пользователи</h1>
+            <p class="text-dark-200 text-sm mt-1">Всего: {{ total }}</p>
+        </div>
+    </div>
+    <div class="glass rounded-2xl p-6">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-dark-200 border-b border-dark-400/30">
+                        <th class="text-left py-3 px-4 font-medium">ID</th>
+                        <th class="text-left py-3 px-4 font-medium">Telegram ID</th>
+                        <th class="text-left py-3 px-4 font-medium">Username</th>
+                        <th class="text-left py-3 px-4 font-medium">Имя</th>
+                        <th class="text-center py-3 px-4 font-medium">Админ</th>
+                        <th class="text-left py-3 px-4 font-medium">Подписки</th>
+                        <th class="text-left py-3 px-4 font-medium">Регистрация</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr class="border-b border-dark-400/10 hover:bg-dark-600/30 transition-colors">
+                        <td class="py-3 px-4 text-dark-100">#{{ user.id }}</td>
+                        <td class="py-3 px-4 text-white font-mono text-xs">{{ user.telegram_id }}</td>
+                        <td class="py-3 px-4">
+                            {% if user.username %}
+                            <span class="text-brand-400">@{{ user.username }}</span>
+                            {% else %}
+                            <span class="text-dark-300">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-4 text-white">{{ user.full_name or '—' }}</td>
+                        <td class="py-3 px-4 text-center">
+                            {% if user.is_admin %}
+                            <span class="text-xs bg-amber-500/15 text-amber-400 px-2 py-1 rounded-full">Admin</span>
+                            {% else %}
+                            <span class="text-dark-300">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-4">
+                            {% set active_count = user.subscriptions | selectattr('is_active') | list | length %}
+                            {% if active_count > 0 %}
+                            <span class="text-xs bg-emerald-500/15 text-emerald-400 px-2 py-1 rounded-full">{{ active_count }} акт.</span>
+                            {% else %}
+                            <span class="text-xs text-dark-300">нет</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-4 text-dark-200 text-xs">{{ user.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if not users %}
+        <div class="text-center py-12 text-dark-200">
+            <i class="fas fa-users text-4xl mb-3 text-dark-300"></i>
+            <p>Нет пользователей</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

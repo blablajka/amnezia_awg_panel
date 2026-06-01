@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Протоколы — Amnezia VPN Admin{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold text-white">Управление протоколами</h1>
+        <p class="text-dark-200 text-sm mt-1">Деплой и переключение VPN протоколов на серверах</p>
+    </div>
+
+    {% if request.query_params.get('deployed') %}
+    <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 text-emerald-400 text-sm">
+        <i class="fas fa-check-circle mr-2"></i>Протокол успешно развёрнут на сервере
+    </div>
+    {% endif %}
+    {% if request.query_params.get('error') %}
+    <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+        <i class="fas fa-exclamation-circle mr-2"></i>{{ request.query_params.get('error') }}
+    </div>
+    {% endif %}
+
+    <!-- Доступные протоколы -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {% for p in protocols %}
+        <div class="glass rounded-2xl p-5">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 rounded-lg bg-{{ p.color }}-500/20 flex items-center justify-center">
+                    <i class="fas {{ p.icon }} text-{{ p.color }}-400"></i>
+                </div>
+                <h3 class="text-white font-semibold">{{ p.name }}</h3>
+            </div>
+            <p class="text-xs text-dark-200">
+                {% if p.id == 'awg' %}WireGuard с обфускацией (AmneziaWG 2.0){% elif p.id == 'hysteria2' %}QUIC-based, маскировка под HTTP/3{% else %}Лёгкий TCP-туннель для релеев{% endif %}
+            </p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Серверы с их протоколами -->
+    <h2 class="text-lg font-semibold text-white mt-6">Серверы</h2>
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {% for item in servers %}
+        {% set s = item.server %}
+        {% set st = item.status %}
+        <div class="card glass rounded-2xl p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">{{ s.country_flag }}</span>
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">{{ s.name }}</h3>
+                        <p class="text-xs text-dark-200 font-mono">{{ s.host }}:{{ s.port }}</p>
+                    </div>
+                </div>
+                {% if st.online %}
+                <span class="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full">
+                    <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>Online
+                </span>
+                {% else %}
+                <span class="flex items-center gap-1.5 text-xs text-red-400 bg-red-500/10 px-3 py-1.5 rounded-full">
+                    <span class="w-2 h-2 bg-red-400 rounded-full"></span>Offline
+                </span>
+                {% endif %}
+            </div>
+
+            <div class="text-xs text-dark-200 mb-3">
+                Текущий контейнер: <span class="text-white font-mono">{{ s.docker_container }}</span>
+            </div>
+
+            <!-- Форма деплоя -->
+            <form action="/protocols/deploy" method="POST" class="space-y-3 mt-4 border-t border-dark-400/20 pt-4">
+                <input type="hidden" name="server_id" value="{{ s.id }}">
+                <select name="protocol" class="w-full bg-dark-700 border border-dark-400/30 rounded-lg px-3 py-2 text-sm text-white">
+                    {% for p in protocols %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" name="acme_domains" placeholder="ACME домены (через запятую)" class="bg-dark-700 border border-dark-400/30 rounded-lg px-3 py-2 text-sm text-white">
+                    <input type="text" name="acme_email" placeholder="ACME email" class="bg-dark-700 border border-dark-400/30 rounded-lg px-3 py-2 text-sm text-white">
+                </div>
+                <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+                    <i class="fas fa-rocket mr-2"></i>Развернуть
+                </button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

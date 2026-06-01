@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Amnezia VPN Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold text-white">Dashboard</h1>
+        <p class="text-dark-200 text-sm mt-1">Обзор системы Amnezia VPN</p>
+    </div>
+
+    <!-- Metric Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <!-- Total Users -->
+        <div class="card glass rounded-2xl p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-blue-500/15 flex items-center justify-center">
+                    <i class="fas fa-users text-blue-400 text-xl"></i>
+                </div>
+                <span class="text-xs font-medium text-green-400 bg-green-400/10 px-2 py-1 rounded-full">
+                    +{{ metrics.new_users_today }} сегодня
+                </span>
+            </div>
+            <p class="text-3xl font-bold text-white">{{ metrics.total_users }}</p>
+            <p class="text-sm text-dark-200 mt-1">Всего пользователей</p>
+        </div>
+
+        <!-- Active Subscriptions -->
+        <div class="card glass rounded-2xl p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-emerald-500/15 flex items-center justify-center">
+                    <i class="fas fa-key text-emerald-400 text-xl"></i>
+                </div>
+            </div>
+            <p class="text-3xl font-bold text-white">{{ metrics.active_subscriptions }}</p>
+            <p class="text-sm text-dark-200 mt-1">Активных подписок</p>
+        </div>
+
+        <!-- Total Revenue -->
+        <div class="card glass rounded-2xl p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-purple-500/15 flex items-center justify-center">
+                    <i class="fas fa-ruble-sign text-purple-400 text-xl"></i>
+                </div>
+            </div>
+            <p class="text-3xl font-bold text-white">{{ metrics.total_revenue }}₽</p>
+            <p class="text-sm text-dark-200 mt-1">Общий доход</p>
+        </div>
+
+        <!-- Revenue Today -->
+        <div class="card glass rounded-2xl p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-amber-500/15 flex items-center justify-center">
+                    <i class="fas fa-chart-line text-amber-400 text-xl"></i>
+                </div>
+            </div>
+            <p class="text-3xl font-bold text-white">{{ metrics.revenue_today }}₽</p>
+            <p class="text-sm text-dark-200 mt-1">Доход сегодня</p>
+        </div>
+    </div>
+
+    <!-- Recent Stats Table -->
+    <div class="glass rounded-2xl p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">
+            <i class="fas fa-calendar-alt text-brand-400 mr-2"></i>
+            Статистика за последние дни
+        </h2>
+        {% if daily_stats %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-dark-200 border-b border-dark-400/30">
+                        <th class="text-left py-3 px-4 font-medium">Дата</th>
+                        <th class="text-right py-3 px-4 font-medium">Новые пользователи</th>
+                        <th class="text-right py-3 px-4 font-medium">Новые подписки</th>
+                        <th class="text-right py-3 px-4 font-medium">Доход</th>
+                        <th class="text-right py-3 px-4 font-medium">Активные подписки</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stat in daily_stats %}
+                    <tr class="border-b border-dark-400/10 hover:bg-dark-600/30 transition-colors">
+                        <td class="py-3 px-4 text-white font-medium">{{ stat.date.strftime('%d.%m.%Y') }}</td>
+                        <td class="py-3 px-4 text-right text-blue-400">+{{ stat.new_users }}</td>
+                        <td class="py-3 px-4 text-right text-emerald-400">+{{ stat.new_subscriptions }}</td>
+                        <td class="py-3 px-4 text-right text-purple-400 font-medium">{{ stat.revenue }}₽</td>
+                        <td class="py-3 px-4 text-right text-dark-100">{{ stat.active_subscriptions }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-12 text-dark-200">
+            <i class="fas fa-chart-bar text-4xl mb-3 text-dark-300"></i>
+            <p>Нет данных за последние дни</p>
+            <p class="text-xs mt-1">Статистика будет собираться автоматически</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

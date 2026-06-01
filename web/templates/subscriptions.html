@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Подписки — Amnezia VPN Admin{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold text-white">Подписки</h1>
+        <p class="text-dark-200 text-sm mt-1">Все подписки пользователей</p>
+    </div>
+    <div class="glass rounded-2xl p-6">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-dark-200 border-b border-dark-400/30">
+                        <th class="text-left py-3 px-4 font-medium">ID</th>
+                        <th class="text-left py-3 px-4 font-medium">Пользователь</th>
+                        <th class="text-left py-3 px-4 font-medium">План</th>
+                        <th class="text-center py-3 px-4 font-medium">Статус</th>
+                        <th class="text-left py-3 px-4 font-medium">Начало</th>
+                        <th class="text-left py-3 px-4 font-medium">Окончание</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sub in subscriptions %}
+                    <tr class="border-b border-dark-400/10 hover:bg-dark-600/30 transition-colors">
+                        <td class="py-3 px-4 text-dark-100">#{{ sub.id }}</td>
+                        <td class="py-3 px-4 text-white">
+                            {% if sub.user %}@{{ sub.user.username or sub.user.telegram_id }}{% else %}#{{ sub.user_id }}{% endif %}
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="text-brand-400 font-medium">{{ sub.plan }}</span>
+                        </td>
+                        <td class="py-3 px-4 text-center">
+                            {% if sub.status == 'active' %}
+                            <span class="text-xs bg-emerald-500/15 text-emerald-400 px-3 py-1 rounded-full">Активна</span>
+                            {% elif sub.status == 'expired' %}
+                            <span class="text-xs bg-red-500/15 text-red-400 px-3 py-1 rounded-full">Истекла</span>
+                            {% else %}
+                            <span class="text-xs bg-gray-500/15 text-gray-400 px-3 py-1 rounded-full">{{ sub.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-4 text-dark-200 text-xs">{{ sub.starts_at.strftime('%d.%m.%Y') }}</td>
+                        <td class="py-3 px-4 text-dark-200 text-xs">{{ sub.expires_at.strftime('%d.%m.%Y') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if not subscriptions %}
+        <div class="text-center py-12 text-dark-200">
+            <i class="fas fa-key text-4xl mb-3 text-dark-300"></i>
+            <p>Нет подписок</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

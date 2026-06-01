@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Статистика — Amnezia VPN Admin{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold text-white">Статистика</h1>
+        <p class="text-dark-200 text-sm mt-1">Детальная аналитика и платежи</p>
+    </div>
+
+    <!-- Quick Metrics -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="glass rounded-2xl p-6 text-center">
+            <p class="text-4xl font-bold text-white">{{ metrics.total_users }}</p>
+            <p class="text-sm text-dark-200 mt-2">Всего пользователей</p>
+        </div>
+        <div class="glass rounded-2xl p-6 text-center">
+            <p class="text-4xl font-bold text-emerald-400">{{ metrics.active_subscriptions }}</p>
+            <p class="text-sm text-dark-200 mt-2">Активных подписок</p>
+        </div>
+        <div class="glass rounded-2xl p-6 text-center">
+            <p class="text-4xl font-bold text-purple-400">{{ metrics.total_revenue }}₽</p>
+            <p class="text-sm text-dark-200 mt-2">Общий доход</p>
+        </div>
+    </div>
+
+    <!-- Payments Table -->
+    <div class="glass rounded-2xl p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">
+            <i class="fas fa-credit-card text-brand-400 mr-2"></i>Последние платежи
+        </h2>
+        {% if payments %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-dark-200 border-b border-dark-400/30">
+                        <th class="text-left py-3 px-4 font-medium">ID</th>
+                        <th class="text-left py-3 px-4 font-medium">Пользователь</th>
+                        <th class="text-left py-3 px-4 font-medium">План</th>
+                        <th class="text-right py-3 px-4 font-medium">Сумма</th>
+                        <th class="text-center py-3 px-4 font-medium">Статус</th>
+                        <th class="text-left py-3 px-4 font-medium">Дата</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in payments %}
+                    <tr class="border-b border-dark-400/10 hover:bg-dark-600/30 transition-colors">
+                        <td class="py-3 px-4 text-dark-100 font-mono text-xs">{{ p.yookassa_payment_id[:12] }}...</td>
+                        <td class="py-3 px-4 text-white">
+                            {% if p.user %}@{{ p.user.username or p.user.telegram_id }}{% else %}#{{ p.user_id }}{% endif %}
+                        </td>
+                        <td class="py-3 px-4 text-brand-400">{{ p.plan }}</td>
+                        <td class="py-3 px-4 text-right text-white font-medium">{{ p.amount }}₽</td>
+                        <td class="py-3 px-4 text-center">
+                            {% if p.status == 'succeeded' %}
+                            <span class="text-xs bg-emerald-500/15 text-emerald-400 px-2 py-1 rounded-full">Оплачен</span>
+                            {% elif p.status == 'pending' %}
+                            <span class="text-xs bg-amber-500/15 text-amber-400 px-2 py-1 rounded-full">Ожидание</span>
+                            {% else %}
+                            <span class="text-xs bg-red-500/15 text-red-400 px-2 py-1 rounded-full">Отменён</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-4 text-dark-200 text-xs">{{ p.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-12 text-dark-200">
+            <i class="fas fa-credit-card text-4xl mb-3 text-dark-300"></i>
+            <p>Нет платежей</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

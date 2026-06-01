@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git ls-tree *)",
+      "mcp__brave-search__brave_web_search"
+    ]
+  }
+}
