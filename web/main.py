@@ -88,6 +88,8 @@ def create_web_app() -> FastAPI:
 
     @app.on_event("startup")
     async def startup_event():
+        from database.session import init_db
+        await init_db()
         asyncio.create_task(cleanup_loop())
 
     # ── Login / Logout ───────────────────────────────────────────────
