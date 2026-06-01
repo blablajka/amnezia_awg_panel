@@ -27,7 +27,7 @@ async def dashboard_page(request: Request):
         metrics = await StatsService.get_dashboard_metrics(session)
         daily_stats = await StatsService.get_daily_stats(session, days=7)
 
-    return templates.TemplateResponse("dashboard.html", {
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={
         "request": request,
         "metrics": metrics,
         "daily_stats": daily_stats,

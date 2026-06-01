@@ -23,6 +23,6 @@ async def servers_page(request: Request):
     for s in servers:
         status = await sm.get_server_status(s)
         server_data.append({"server": s, "status": status})
-    return templates.TemplateResponse("servers.html", {
+    return templates.TemplateResponse(request=request, name="servers.html", context={
         "request": request, "servers": server_data, "page": "servers",
     })

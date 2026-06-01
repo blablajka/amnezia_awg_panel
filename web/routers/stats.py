@@ -20,7 +20,7 @@ async def stats_page(request: Request):
         metrics = await StatsService.get_dashboard_metrics(session)
         daily = await StatsService.get_daily_stats(session, days=30)
         payments = await crud.get_all_payments(session, limit=50)
-    return templates.TemplateResponse("stats.html", {
+    return templates.TemplateResponse(request=request, name="stats.html", context={
         "request": request, "metrics": metrics,
         "daily_stats": daily, "payments": payments, "page": "stats",
     })

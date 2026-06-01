@@ -20,6 +20,6 @@ async def subscriptions_page(request: Request):
         stmt = select(Subscription).order_by(Subscription.created_at.desc()).limit(200)
         result = await session.execute(stmt)
         subs = list(result.scalars().all())
-    return templates.TemplateResponse("subscriptions.html", {
+    return templates.TemplateResponse(request=request, name="subscriptions.html", context={
         "request": request, "subscriptions": subs, "page": "subscriptions",
     })

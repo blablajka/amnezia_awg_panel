@@ -18,6 +18,6 @@ async def users_page(request: Request):
     async with async_session_factory() as session:
         users = await crud.get_all_users(session, limit=200)
         total = await crud.count_users(session)
-    return templates.TemplateResponse("users.html", {
+    return templates.TemplateResponse(request=request, name="users.html", context={
         "request": request, "users": users, "total": total, "page": "users",
     })

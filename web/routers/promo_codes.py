@@ -19,7 +19,7 @@ async def promo_codes_page(request: Request):
     templates = request.app.state.templates
     async with async_session_factory() as session:
         promos = await crud.get_all_promo_codes(session)
-    return templates.TemplateResponse("promo_codes.html", {
+    return templates.TemplateResponse(request=request, name="promo_codes.html", context={
         "request": request, "promos": promos, "page": "promo_codes",
     })
 

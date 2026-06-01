@@ -32,7 +32,7 @@ async def protocols_page(request: Request):
         status = await sm.get_server_status(s)
         server_data.append({"server": s, "status": status})
 
-    return templates.TemplateResponse("protocols.html", {
+    return templates.TemplateResponse(request=request, name="protocols.html", context={
         "request": request, "servers": server_data,
         "protocols": AVAILABLE_PROTOCOLS, "page": "protocols",
     })

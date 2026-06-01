@@ -101,7 +101,7 @@ def create_web_app() -> FastAPI:
         token = get_session_token(request)
         if verify_session(token):
             return RedirectResponse(f"{settings.ADMIN_PATH}/dashboard", status_code=302)
-        return templates.TemplateResponse("login.html", {
+        return templates.TemplateResponse(request=request, name="login.html", context={
             "request": request, "error": None, "admin_path": settings.ADMIN_PATH
         })
 
@@ -121,7 +121,7 @@ def create_web_app() -> FastAPI:
             )
             return response
 
-        return templates.TemplateResponse("login.html", {
+        return templates.TemplateResponse(request=request, name="login.html", context={
             "request": request,
             "error": "Неверный логин или пароль",
             "admin_path": settings.ADMIN_PATH

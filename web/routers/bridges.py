@@ -23,7 +23,7 @@ async def bridges_page(request: Request):
         bridges = await crud.get_all_bridges(session)
         servers = await crud.get_active_servers(session)
 
-    return templates.TemplateResponse("bridges.html", {
+    return templates.TemplateResponse(request=request, name="bridges.html", context={
         "request": request, "bridges": bridges,
         "servers": servers, "page": "bridges",
         "admin_path": settings.ADMIN_PATH,
