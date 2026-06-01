@@ -9,13 +9,13 @@ export DEBIAN_FRONTEND=noninteractive
 
 # 1. Update and install minimal deps
 echo "=> Обновление пакетов и установка зависимостей..."
-apt-get update -y > /dev/null
-apt-get install -yq git python3 python3-venv python3-pip nginx curl jq uuid-runtime > /dev/null
+apt-get update -y
+apt-get install -y git python3 python3-venv python3-pip nginx curl jq uuid-runtime
 
 # 2. Clone repository
 echo "=> Скачивание репозитория..."
 rm -rf /opt/panel
-git clone -q "https://github.com/blablajka/amnezia_awg_panel.git" /opt/panel
+git clone "https://github.com/blablajka/amnezia_awg_panel.git" /opt/panel
 
 # 3. Generate Secret Environment
 echo "=> Генерация секретного конфигурационного файла..."
@@ -30,10 +30,10 @@ SECRET_KEY=$SECRET_KEY
 ENVEOF
 
 # 4. Setup Python virtual environment
-echo "=> Настройка Python окружения..."
+echo "=> Настройка Python окружения и установка зависимостей (это может занять пару минут)..."
 python3 -m venv venv
 source venv/bin/activate
-pip install -q -r requirements.txt
+pip install -r requirements.txt
 
 # 5. Create Systemd Service
 echo "=> Создание системной службы..."
@@ -54,7 +54,19 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now amnezia-panel
+
+set +e # Отключаем прерывание скрипта при ошибке, чтобы показать логи
+echo "=> Запуск службы amnezia-panel..."
+if ! systemctl enable --now amnezia-panel; then
+    echo "================================================="
+    echo "❌ ОШИБКА: Не удалось запустить службу панели!"
+    echo "================================================="
+    echo "Последние 50 строк логов службы:"
+    journalctl -u amnezia-panel -n 50 --no-pager
+    echo "================================================="
+    exit 1
+fi
+set -e
 
 # 6. Configure Nginx
 echo "=> Настройка Nginx..."
