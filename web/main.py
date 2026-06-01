@@ -67,9 +67,6 @@ def create_web_app() -> FastAPI:
     admin_router.include_router(stats.router)
     admin_router.include_router(protocols.router)
     admin_router.include_router(bridges.router)
-
-    app.include_router(admin_router)
-
     # Заглушка для корневого URL (защита от сканеров)
     @app.get("/")
     async def root_stub():
@@ -137,4 +134,5 @@ def create_web_app() -> FastAPI:
         response.delete_cookie("session_token")
         return response
 
+    app.include_router(admin_router)
     return app
