@@ -6,7 +6,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from database.session import async_session_factory
 from database import crud
 from services.server_manager import ServerManager
-from services.protocols import GostProtocolHandler
 from web.auth import get_session_token, verify_session
 
 router = APIRouter(prefix="/bridges", tags=["bridges"])
@@ -27,6 +26,7 @@ async def bridges_page(request: Request):
     return templates.TemplateResponse("bridges.html", {
         "request": request, "bridges": bridges,
         "servers": servers, "page": "bridges",
+        "admin_path": settings.ADMIN_PATH,
     })
 
 
@@ -35,7 +35,7 @@ async def create_bridge(
     request: Request,
     server_from_id: int = Form(...),
     server_to_id: int = Form(...),
-    protocol: str = Form("gost"),
+    protocol: str = Form("awg_bridge"),
 ):
     token = get_session_token(request)
     if not verify_session(token):
@@ -49,14 +49,9 @@ async def create_bridge(
         from_server = await crud.get_server_by_id(session, server_from_id)
         to_server = await crud.get_server_by_id(session, server_to_id)
 
-        if protocol == "gost" and from_server and to_server:
-            try:
-                gost = GostProtocolHandler()
-                result = await gost.setup_bridge(from_server, to_server)
-                bridge.config_data = str(result)
-            except Exception as e:
-                bridge.config_data = f"Deploy error: {e}"
-
+        # Мосты пока работают в тестовом режиме, ждем реализации AWG Bridge
+        bridge.config_data = "AWG Bridge Not Implemented Yet"
+        
         await session.commit()
 
     return RedirectResponse(f"{settings.ADMIN_PATH}/bridges?created=1", status_code=302)
