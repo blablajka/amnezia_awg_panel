@@ -121,12 +121,12 @@ def create_web_app() -> FastAPI:
         asyncio.create_task(cleanup_loop())
         asyncio.create_task(traffic_billing_loop())
 
-        # Start Telegram bot if token is configured
+        # Start Telegram bot in background (non-blocking)
         if settings.BOT_TOKEN and settings.BOT_TOKEN != "dummy_token_to_allow_startup":
             try:
                 from bot.handlers import start_bot
-                await start_bot()
-                logger.info("Telegram bot started")
+                asyncio.create_task(start_bot())
+                logger.info("Telegram bot background task created")
             except Exception as e:
                 logger.warning("Telegram bot failed to start: %s", e)
 
