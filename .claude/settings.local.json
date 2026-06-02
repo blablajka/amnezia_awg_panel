@@ -2,14 +2,18 @@
   "permissions": {
     "allow": [
       "mcp__brave-search__brave_web_search",
-      "Bash(python *)",
-      "Bash(pip install *)",
       "WebFetch(domain:docs.amnezia.org)",
-      "WebFetch(domain:v2.hysteria.network)",
-      "mcp__context7__resolve-library-id",
-      "mcp__context7__query-docs",
-      "Bash(sshpass -p 'x7CTv6CgqvE4BFu3' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@195.208.119.192 'echo \"CONNECTED\"; uname -a; echo \"---DOCKER---\"; docker --version 2>/dev/null || echo \"NO DOCKER\"; echo \"---PORTS---\"; ss -tlnp 2>/dev/null | head -20 || netstat -tlnp 2>/dev/null | head -20')",
-      "Bash(alembic revision *)"
+      "WebFetch(domain:amnezia.org)",
+      "WebFetch(domain:github.com)",
+      "mcp__plugin_ecc_exa__web_fetch_exa",
+      "mcp__plugin_ecc_github__get_file_contents",
+      "Bash(python3 *)",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git add *)",
+      "Bash(echo '__pycache__/ *)",
+      "Bash(sort -u .gitignore -o .gitignore)",
+      "Bash(git commit -m 'Smart VPN Panel v2 — Full AWG 2.0 + Cascade + Telegram Bot *)"
     ]
   }
 }

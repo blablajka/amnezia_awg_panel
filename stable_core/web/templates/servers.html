@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Servers — Smart VPN{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-white">VPN Servers</h1>
+            <p class="text-dark-200 text-sm mt-1">Manage AmneziaWG servers & cascade tunnels</p>
+        </div>
+        <button onclick="document.getElementById('addServerModal').classList.remove('hidden')"
+            class="px-4 py-2.5 bg-brand-600 text-white rounded-xl font-medium hover:bg-brand-500 transition-colors">
+            <i class="fas fa-plus mr-2"></i>Add Server
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {% for item in servers %}
+        {% set s = item.server %}
+        {% set st = item.status %}
+        <div class="card glass rounded-2xl p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <span class="text-3xl">{{ s.country_flag }}</span>
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">{{ s.name }}</h3>
+                        <p class="text-xs text-dark-200 font-mono">{{ s.host }}{% if s.port != 22 %}:{{ s.port }}{% endif %}</p>
+                    </div>
+                </div>
+                {% if st.status == 'online' %}
+                <span class="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full">
+                    <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>Online
+                </span>
+                {% else %}
+                <span class="flex items-center gap-1.5 text-xs text-red-400 bg-red-500/10 px-3 py-1.5 rounded-full">
+                    <span class="w-2 h-2 bg-red-400 rounded-full"></span>Offline
+                </span>
+                {% endif %}
+            </div>
+            <div class="space-y-3">
+                <div class="flex justify-between text-sm">
+                    <span class="text-dark-200">Protocol</span>
+                    <span class="text-white font-mono text-xs uppercase">{{ s.protocol or 'awg' }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-dark-200">Peers</span>
+                    <span class="text-brand-400 font-semibold">{{ st.peers if st.peers is defined else 0 }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-dark-200">Preset</span>
+                    <span class="text-white">{{ s.awg_preset or 'default' }}</span>
+                </div>
+                {% if s.awg_params %}
+                <div class="flex justify-between text-sm">
+                    <span class="text-dark-200">AWG 2.0</span>
+                    <span class="text-emerald-400 text-xs">Configured</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not servers %}
+        <div class="col-span-full glass rounded-2xl p-12 text-center text-dark-200">
+            <i class="fas fa-server text-4xl mb-3 text-dark-300"></i>
+            <p class="text-lg">No servers yet</p>
+            <p class="text-sm mt-1">Click "Add Server" to connect your first VPS</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Add Server Modal (Russia VPS or Foreign) -->
+    <div id="addServerModal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="this.parentElement.classList.add('hidden')"></div>
+        <div class="relative glass rounded-2xl p-8 w-full max-w-lg mx-4 shadow-2xl border border-dark-400/30">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold text-white">Add New Server</h2>
+                <button onclick="document.getElementById('addServerModal').classList.add('hidden')"
+                    class="text-dark-200 hover:text-white text-xl">✕</button>
+            </div>
+            <form method="POST" action="{{ admin_path }}/servers/add" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-dark-100 mb-1">Server Name</label>
+                    <input type="text" name="name" required placeholder="Denmark Exit"
+                        class="w-full px-4 py-2.5 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white placeholder-dark-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-dark-100 mb-1">Host / IP</label>
+                        <input type="text" name="host" required placeholder="45.67.89.123"
+                            class="w-full px-4 py-2.5 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white placeholder-dark-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-dark-100 mb-1">SSH Port</label>
+                        <input type="number" name="port" value="22"
+                            class="w-full px-4 py-2.5 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-dark-100 mb-1">SSH User</label>
+                        <input type="text" name="ssh_user" value="root"
+                            class="w-full px-4 py-2.5 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-dark-100 mb-1">Password</label>
+                        <input type="password" name="ssh_password" placeholder="••••••••"
+                            class="w-full px-4 py-2.5 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white placeholder-dark-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-dark-100 mb-1">Country</label>
+                        <select name="country_code"
+                            class="w-full px-4 py-2.5 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm">
+                            <option value="DK">🇩🇰 Denmark (Exit)</option>
+                            <option value="NL">🇳🇱 Netherlands</option>
+                            <option value="DE">🇩🇪 Germany</option>
+                            <option value="LT">🇱🇹 Lithuania</option>
+                            <option value="RU">🇷🇺 Russia (Entry)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-dark-100 mb-1">AWG Preset</label>
+                        <select name="preset"
+                            class="w-full px-4 py-2.5 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm">
+                            <option value="default">Default (Home/WiFi)</option>
+                            <option value="mobile">Mobile (Tele2/Yota/Megafon)</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit"
+                    class="w-full py-3 bg-gradient-to-r from-brand-500 to-brand-700 text-white font-semibold rounded-xl hover:from-brand-400 hover:to-brand-600 transition-all shadow-lg shadow-brand-500/20 mt-2">
+                    <i class="fas fa-rocket mr-2"></i>Add Server & Auto-Install
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

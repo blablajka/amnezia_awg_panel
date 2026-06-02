@@ -1,8 +1,10 @@
-﻿__pycache__
-*.pyc
-.env
 *.db
-venv
-.venv
-awg_readme.md
-
+*.log
+*.pyc
+.claude/
+.env
+.env\n__pycache__/\n*.pyc\nvpn_system.db\nlogs/\n*.log\n.venv/\nvenv/
+.venv/
+__pycache__/
+logs/
+venv/
