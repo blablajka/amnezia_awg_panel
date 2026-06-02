@@ -1,35 +1,29 @@
-# Smart VPN Panel — Default Credentials
+# Smart VPN Panel
 
-## Admin Panel
+## One-command install
 
-| Field | Default Value |
-|-------|---------------|
-| **Username** | `admin` |
-| **Password** | `vpn2026secure` |
-
-Change via `.env`:
-```
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=vpn2026secure
-```
-
-Or pass during install:
 ```bash
-sudo ADMIN_USERNAME="myadmin" ADMIN_PASSWORD="mystrongpass" bash install.sh
+wget -O install.sh https://raw.githubusercontent.com/blablajka/amnezia_awg_panel/master/stable_core/install.sh && chmod +x install.sh && sudo BOT_TOKEN="твой_токен" bash install.sh
 ```
+
+## Login / Password
+
+```
+URL:    http://ТВОЙ_IP_СЕРВЕРА/<uuid>/dashboard
+Login:  admin
+Pass:   vpn2026secure
+```
+
+URL с UUID печатается в конце установки — сохрани его.
 
 ## Bot Token
 
-Set in `.env` or pass during install:
-```bash
-sudo BOT_TOKEN="123456:ABCdef..." bash install.sh
-```
+Передаётся при установке через переменную или уже лежит в `.env` на сервере.
 
-## Panel URL
+## Что дальше
 
-Panel is mounted at a random UUID path for protection:
-```
-http://YOUR_SERVER_IP/<random-uuid>/dashboard
-```
-
-The exact URL is printed at the end of `install.sh` output — **save it**.
+1. Зайди в панель по URL из вывода установки
+2. Servers → Add Server (российский VPS)
+3. Servers → Add Server (датский VPS)
+4. Bridges → Create Cascade (Russia → Denmark)
+5. Бот: /start → /plans → купить → получить .conf
