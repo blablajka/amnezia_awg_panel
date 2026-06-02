@@ -153,6 +153,12 @@ async def expire_subscriptions(session: AsyncSession) -> list[Subscription]:
     return expired
 
 
+async def get_subscription_by_id(
+    session: AsyncSession, subscription_id: int,
+) -> Subscription | None:
+    return await session.get(Subscription, subscription_id)
+
+
 async def count_active_subscriptions(session: AsyncSession) -> int:
     now = datetime.now(timezone.utc)
     stmt = select(func.count(Subscription.id)).where(

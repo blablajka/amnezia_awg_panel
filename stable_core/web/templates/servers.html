@@ -109,16 +109,23 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
+                        <label class="block text-xs font-medium text-dark-100 mb-1">AWG Listen Port</label>
+                        <input type="number" name="awg_listen_port" value="39743"
+                            class="w-full px-4 py-2.5 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm">
+                    </div>
+                    <div>
                         <label class="block text-xs font-medium text-dark-100 mb-1">Country</label>
                         <select name="country_code"
                             class="w-full px-4 py-2.5 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm">
+                            <option value="RU" selected>🇷🇺 Russia (Entry)</option>
                             <option value="DK">🇩🇰 Denmark (Exit)</option>
                             <option value="NL">🇳🇱 Netherlands</option>
                             <option value="DE">🇩🇪 Germany</option>
                             <option value="LT">🇱🇹 Lithuania</option>
-                            <option value="RU">🇷🇺 Russia (Entry)</option>
                         </select>
                     </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-dark-100 mb-1">AWG Preset</label>
                         <select name="preset"
@@ -126,6 +133,13 @@
                             <option value="default">Default (Home/WiFi)</option>
                             <option value="mobile">Mobile (Tele2/Yota/Megafon)</option>
                         </select>
+                    </div>
+                    <div class="flex items-end pb-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="ipv6_enabled" value="true"
+                                class="w-4 h-4 rounded bg-dark-700 border-dark-400 text-brand-500 focus:ring-brand-500">
+                            <span class="text-xs text-dark-100">Enable IPv6 dual-stack</span>
+                        </label>
                     </div>
                 </div>
                 <button type="submit"

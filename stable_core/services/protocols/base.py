@@ -12,8 +12,8 @@ class BaseProtocolHandler(ABC):
     """Общий интерфейс для всех VPN-протокольных хендлеров."""
 
     @abstractmethod
-    async def create_client(self, server: Server, client_name: str) -> str:
-        """Создать клиента, вернуть полный текст конфигурации."""
+    async def create_client(self, server: Server, client_name: str) -> tuple[str, str]:
+        """Создать клиента, вернуть (config_data, client_identifier)."""
         ...
 
     @abstractmethod

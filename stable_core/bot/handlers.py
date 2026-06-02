@@ -1,18 +1,19 @@
 """
-Telegram Bot — subscription management & client delivery.
+Telegram Bot — подписки, оплата, выдача конфигов.
 
 Commands:
-  /start — register & welcome
-  /plans — show subscription plans
-  /status — current subscription & configs
-  /config — get VPN config files
-  /referral — get referral link
+  /start    — регистрация
+  /plans    — выбор и покупка подписки
+  /status   — статус подписки
+  /config   — получить .conf файлы
+  /referral — реферальная ссылка
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -21,7 +22,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import settings
 from database.session import async_session_factory
 from database import crud
-from database.models import SubscriptionStatus
+from database.models import PaymentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,10 @@ def main_keyboard():
     )
 
 
+# ═══════════════════════════════════════════════════════════════
+# /start
+# ═══════════════════════════════════════════════════════════════
+
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     tg_id = message.from_user.id
@@ -58,57 +63,68 @@ async def cmd_start(message: types.Message):
         user = await crud.get_or_create_user(
             session, tg_id, username=username, full_name=full_name,
         )
-        # Handle referral
-        ref_arg = message.text.split()[-1] if len(message.text.split()) > 1 else ""
-        if ref_arg.startswith("ref") and ref_arg[3:].isdigit():
-            ref_id = int(ref_arg[3:])
-            if ref_id != user.id and not user.referrer_id:
-                user.referrer_id = ref_id
-                # Bonus days for referrer
-                referrer = await crud.get_user_by_id(session, ref_id)
-                if referrer:
-                    sub = await crud.get_active_subscription(session, ref_id)
-                    if sub:
-                        from datetime import timedelta
-                        sub.expires_at = sub.expires_at + timedelta(
-                            days=settings.REFERRAL_BONUS_DAYS,
-                        )
+        # Referral handling
+        parts = message.text.split()
+        if len(parts) > 1:
+            ref_arg = parts[-1]
+            if ref_arg.startswith("ref") and ref_arg[3:].isdigit():
+                ref_id = int(ref_arg[3:])
+                if ref_id != user.id and not user.referrer_id:
+                    user.referrer_id = ref_id
+                    referrer = await crud.get_user_by_id(session, ref_id)
+                    if referrer:
+                        sub = await crud.get_active_subscription(session, ref_id)
+                        if sub:
+                            sub.expires_at = sub.expires_at + timedelta(
+                                days=settings.REFERRAL_BONUS_DAYS,
+                            )
         await session.commit()
 
     await message.answer(
-        f"\U0001f6e1 <b>Smart VPN Panel</b>\n\n"
-        f"Welcome, {full_name}!\n"
-        f"Plans: /plans\n"
-        f"Status: /status",
+        "\U0001f6e1 <b>Smart VPN Panel</b>\n\n"
+        "Welcome, %s!\n\n"
+        "Available plans: /plans\n"
+        "Subscription status: /status\n"
+        "Get config: /config" % full_name,
         parse_mode="HTML",
         reply_markup=main_keyboard(),
     )
 
 
+# ═══════════════════════════════════════════════════════════════
+# /plans
+# ═══════════════════════════════════════════════════════════════
+
 @dp.message(Command("plans"))
 async def cmd_plans(message: types.Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text=f"{name} - {price}₽",
-            callback_data=f"buy:{plan_key}",
+            text="%s — %s₽" % (name, price) if price > 0 else "%s — Free" % name,
+            callback_data="buy:%s" % plan_key,
         )]
         for plan_key, (name, days, price) in PLAN_DESCRIPTIONS.items()
     ])
+    lines = ["\U0001f4cb <b>VPN Plans:</b>\n"]
+    for plan_key, (name, days, price) in PLAN_DESCRIPTIONS.items():
+        if price > 0:
+            lines.append("• <b>%s</b> — %d₽ (%d days)" % (name, price, days))
+        else:
+            lines.append("• <b>%s</b> — Free (%d days)" % (name, days))
+
     await message.answer(
-        "\U0001f4cb <b>Smart VPN Plans:</b>\n\n"
-        + "\n".join(
-            f"• <b>{name}</b> - {price}₽" if price > 0
-            else f"• <b>{name}</b> - Free"
-            for _, (name, _, price) in PLAN_DESCRIPTIONS.items()
-        ),
+        "\n".join(lines),
         parse_mode="HTML",
         reply_markup=keyboard,
     )
 
 
+# ═══════════════════════════════════════════════════════════════
+# Buy flow (inline callback)
+# ═══════════════════════════════════════════════════════════════
+
 @dp.callback_query(F.data.startswith("buy:"))
 async def handle_buy(callback: types.CallbackQuery):
-    plan_key = callback.data.split(":")[1]
+    plan_key = callback.data.split(":", 1)[1]
     plan_info = PLAN_DESCRIPTIONS.get(plan_key)
     if not plan_info:
         await callback.answer("Unknown plan")
@@ -123,35 +139,204 @@ async def handle_buy(callback: types.CallbackQuery):
             await callback.answer("Use /start first")
             return
 
+        # Already has active subscription?
+        existing = await crud.get_active_subscription(session, user.id)
+        if existing:
+            await callback.message.edit_text(
+                "⚠️ You already have an active subscription.\n"
+                "Valid until: %s\n\n"
+                "Status: /status | Config: /config" % existing.expires_at.strftime("%d.%m.%Y"),
+                parse_mode="HTML",
+            )
+            await callback.answer()
+            return
+
         now = datetime.now(timezone.utc)
-        sub = await crud.create_subscription(
-            session, user.id, plan=plan_key,
-            starts_at=now,
-            expires_at=datetime.fromtimestamp(
-                now.timestamp() + days * 86400, tz=timezone.utc,
-            ),
-        )
+        expires_at = now + timedelta(days=days)
 
         if plan_key == "7_days":
+            # Trial: activate immediately + provision
+            sub = await crud.create_subscription(
+                session, user.id, plan=plan_key,
+                starts_at=now, expires_at=expires_at,
+            )
             await session.commit()
+
             await callback.message.edit_text(
-                f"✅ <b>Trial activated!</b>\n"
-                f"Plan: {name}\n"
-                f"Valid until: {sub.expires_at.strftime('%d.%m.%Y')}\n\n"
-                f"Get config: /config",
+                "✅ <b>Trial activated!</b>\n"
+                "Plan: %s\n"
+                "Valid until: %s\n\n"
+                "⏳ Provisioning servers..." % (name, sub.expires_at.strftime("%d.%m.%Y")),
                 parse_mode="HTML",
             )
+            await callback.answer()
+            await _provision_and_deliver(callback.message, session, user.id, sub.id)
+
         else:
-            await session.commit()
-            await callback.message.edit_text(
-                f"\U0001f4b3 <b>Payment required</b>\n"
-                f"Plan: {name}\n"
-                f"Amount: {price}₽\n\n"
-                f"Contact support: {settings.SUPPORT_USERNAME}",
-                parse_mode="HTML",
+            # Paid plan: create subscription as PENDING, activate on payment
+            import secrets
+            payment_id = "test_%s_%s" % (tg_id, secrets.token_hex(4))
+            amount = Decimal(str(price))
+
+            payment = await crud.create_payment(
+                session, user_id=user.id,
+                yookassa_payment_id=payment_id,
+                amount=amount, plan=plan_key,
             )
+            sub = await crud.create_subscription(
+                session, user.id, plan=plan_key,
+                starts_at=now, expires_at=expires_at,
+            )
+            # Set subscription as pending until payment confirmed
+            from database.models import SubscriptionStatus
+            sub.status = SubscriptionStatus.CANCELLED.value  # Not active yet
+            payment.subscription_id = sub.id
+            await session.commit()
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="💳 Pay %d₽ (Test Mode)" % price,
+                    callback_data="pay:%s:%s" % (payment_id, sub.id),
+                )],
+                [InlineKeyboardButton(
+                    text="❌ Cancel",
+                    callback_data="cancel_pay:%s" % payment_id,
+                )],
+            ])
+
+            await callback.message.edit_text(
+                "💰 <b>%s</b>\n"
+                "Amount: <b>%d₽</b>\n"
+                "Duration: <b>%d days</b>\n\n"
+                "<i>Test mode: payment auto-confirms.</i>" % (name, price, days),
+                parse_mode="HTML",
+                reply_markup=keyboard,
+            )
+            await callback.answer()
+
+
+# ═══════════════════════════════════════════════════════════════
+# Payment confirmation (placeholder — auto-succeeds after 2s)
+# ═══════════════════════════════════════════════════════════════
+
+@dp.callback_query(F.data.startswith("pay:"))
+async def handle_pay(callback: types.CallbackQuery):
+    parts = callback.data.split(":")
+    payment_id = parts[1]
+    sub_id = int(parts[2])
+
+    await callback.message.edit_text(
+        "⏳ <b>Processing payment...</b>\n\n"
+        "<i>Test mode: confirming in 2s...</i>",
+        parse_mode="HTML",
+    )
+    await callback.answer()
+    await asyncio.sleep(2)
+
+    async with async_session_factory() as session:
+        await crud.update_payment_status(
+            session, yookassa_payment_id=payment_id,
+            status=PaymentStatus.SUCCEEDED.value,
+            subscription_id=sub_id,
+        )
+        sub = await crud.get_subscription_by_id(session, sub_id)
+        if not sub:
+            await callback.message.edit_text("❌ Subscription not found.")
+            await callback.answer()
+            return
+
+        # Activate subscription now that payment is confirmed
+        from database.models import SubscriptionStatus
+        sub.status = SubscriptionStatus.ACTIVE.value
+        user_id = sub.user_id
+        await session.commit()
+
+    async with async_session_factory() as session:
+        await _provision_and_deliver(callback.message, session, user_id, sub_id)
+
+
+@dp.callback_query(F.data.startswith("cancel_pay:"))
+async def handle_cancel_pay(callback: types.CallbackQuery):
+    payment_id = callback.data.split(":", 1)[1]
+    async with async_session_factory() as session:
+        await crud.update_payment_status(
+            session, yookassa_payment_id=payment_id,
+            status=PaymentStatus.CANCELED.value,
+        )
+        await session.commit()
+
+    await callback.message.edit_text("❌ Payment cancelled.\nChoose a plan: /plans")
     await callback.answer()
 
+
+# ═══════════════════════════════════════════════════════════════
+# Provision servers + deliver configs to user
+# ═══════════════════════════════════════════════════════════════
+
+async def _provision_and_deliver(
+    message: types.Message,
+    session,
+    user_id: int,
+    subscription_id: int,
+):
+    from services.subscription_service import SubscriptionService
+
+    try:
+        results = await SubscriptionService.provision_all_servers(
+            session, user_id, subscription_id,
+        )
+        await session.commit()
+
+        configs = []
+        errors = []
+        for r in results:
+            if r.get("success"):
+                configs.append(r)
+            else:
+                errors.append(r)
+
+        if configs:
+            lines = ["✅ <b>VPN is ready!</b>\n"]
+            for c in configs:
+                srv = c.get("server")
+                srv_name = srv.name if srv else "Unknown"
+                flag = srv.country_flag if srv else "🌍"
+                lines.append("%s <b>%s</b>" % (flag, srv_name))
+                us = c.get("user_server")
+                conf_text = us.config_data if us else c.get("config", "")
+                client_name = us.client_name if us else "vpn"
+                await message.answer_document(
+                    types.BufferedInputFile(
+                        conf_text.encode("utf-8"),
+                        filename="%s.conf" % client_name,
+                    ),
+                    caption="%s %s — %s" % (flag, srv_name, client_name),
+                )
+            if errors:
+                lines.append("\n⚠️ %d server(s) failed." % len(errors))
+            await message.answer(
+                "\n".join(lines),
+                parse_mode="HTML",
+                reply_markup=main_keyboard(),
+            )
+        else:
+            await message.answer(
+                "⚠️ No servers available for provisioning.\n"
+                "Contact support: %s" % settings.SUPPORT_USERNAME,
+                reply_markup=main_keyboard(),
+            )
+    except Exception as e:
+        logger.error("Provision failed for user %s sub %s: %s", user_id, subscription_id, e)
+        await message.answer(
+            "❌ Provisioning failed: %s\n"
+            "Contact support: %s" % (str(e)[:200], settings.SUPPORT_USERNAME),
+            reply_markup=main_keyboard(),
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+# /status
+# ═══════════════════════════════════════════════════════════════
 
 @dp.message(Command("status"))
 async def cmd_status(message: types.Message):
@@ -166,17 +351,20 @@ async def cmd_status(message: types.Message):
 
     if sub:
         status_text = (
-            f"\U0001f7e2 <b>Subscription active</b>\n"
-            f"Plan: {sub.plan}\n"
-            f"Valid until: {sub.expires_at.strftime('%d.%m.%Y %H:%M')}\n"
-        )
+            "🟢 <b>Subscription active</b>\n"
+            "Plan: %s\n"
+            "Valid until: %s\n"
+        ) % (sub.plan, sub.expires_at.strftime("%d.%m.%Y %H:%M"))
     else:
-        status_text = "\U0001f534 <b>No active subscription</b>\nBuy: /plans\n"
+        status_text = "🔴 <b>No active subscription</b>\nBuy: /plans\n"
 
-    status_text += f"\nConfigs: {len(configs)}"
-
+    status_text += "\nConfigs: %d" % len(configs)
     await message.answer(status_text, parse_mode="HTML", reply_markup=main_keyboard())
 
+
+# ═══════════════════════════════════════════════════════════════
+# /config
+# ═══════════════════════════════════════════════════════════════
 
 @dp.message(Command("config"))
 async def cmd_config(message: types.Message):
@@ -188,15 +376,15 @@ async def cmd_config(message: types.Message):
             return
         sub = await crud.get_active_subscription(session, user.id)
         if not sub:
-            await message.answer("❌ No active subscription. /plans")
+            await message.answer("❌ No active subscription.\n/plans")
             return
         configs = await crud.get_user_configs(session, user.id, subscription_id=sub.id)
 
     if not configs:
         await message.answer(
-            "\U0001f504 Configs not yet created.\n"
-            "Admin will add you to servers manually.\n"
-            "Then retry /config",
+            "🔄 Configs not generated yet.\n"
+            "Use /status to check, then /config to retry.\n"
+            "If issue persists, contact %s" % settings.SUPPORT_USERNAME,
             reply_markup=main_keyboard(),
         )
         return
@@ -205,11 +393,15 @@ async def cmd_config(message: types.Message):
         await message.answer_document(
             types.BufferedInputFile(
                 us.config_data.encode("utf-8"),
-                filename=f"{us.client_name}.conf",
+                filename="%s.conf" % us.client_name,
             ),
-            caption=f"\U0001f511 {us.client_name}\nServer: #{us.server_id}",
+            caption="🔑 %s\nServer: #%d" % (us.client_name, us.server_id),
         )
 
+
+# ═══════════════════════════════════════════════════════════════
+# /referral
+# ═══════════════════════════════════════════════════════════════
 
 @dp.message(Command("referral"))
 async def cmd_referral(message: types.Message):
@@ -222,15 +414,19 @@ async def cmd_referral(message: types.Message):
             return
         ref_count = await crud.count_referrals(session, user.id)
 
-    ref_link = f"https://t.me/{bot_info.username}?start=ref{user.id}"
+    ref_link = "https://t.me/%s?start=ref%s" % (bot_info.username, user.id)
     await message.answer(
-        f"\U0001f465 <b>Referral Program</b>\n\n"
-        f"Invite a friend - get +{settings.REFERRAL_BONUS_DAYS} days!\n\n"
-        f"Your link:\n<code>{ref_link}</code>\n\n"
-        f"Invited: {ref_count}",
+        "👥 <b>Referral Program</b>\n\n"
+        "Invite a friend — get +%d days!\n\n"
+        "Your link:\n<code>%s</code>\n\n"
+        "Invited: %d" % (settings.REFERRAL_BONUS_DAYS, ref_link, ref_count),
         parse_mode="HTML",
     )
 
+
+# ═══════════════════════════════════════════════════════════════
+# Lifecycle
+# ═══════════════════════════════════════════════════════════════
 
 async def start_bot():
     logger.info("Starting Telegram bot...")

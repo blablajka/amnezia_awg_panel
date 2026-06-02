@@ -103,17 +103,11 @@ class SubscriptionService:
                 # Используем протокольный хендлер сервера
                 protocol = getattr(server, "protocol", "awg") or "awg"
                 handler = get_protocol_handler(protocol)
-                result = await handler.create_client(
+                config_data, client_id = await handler.create_client(
                     server=server,
                     client_name=client_name,
                 )
-                
-                if isinstance(result, tuple) and len(result) == 2:
-                    config_data, client_id = result
-                    actual_client_name = client_id
-                else:
-                    config_data = result
-                    actual_client_name = client_name
+                actual_client_name = client_id
 
                 # Сохраняем в БД
                 user_server = await crud.create_user_server(

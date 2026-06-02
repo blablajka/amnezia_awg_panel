@@ -175,6 +175,7 @@ class Server(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)  # "Germany"
     host: Mapped[str] = mapped_column(String(255), nullable=False)  # SSH host/IP
     port: Mapped[int] = mapped_column(Integer, default=22, nullable=False)  # SSH port
+    awg_listen_port: Mapped[int] = mapped_column(Integer, default=39743, nullable=False)  # AWG UDP listen port
     ssh_user: Mapped[str] = mapped_column(String(255), default="root", nullable=False)
     ssh_key_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     ssh_password: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)

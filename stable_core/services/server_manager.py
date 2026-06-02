@@ -137,13 +137,18 @@ class ServerManager:
 
     @staticmethod
     def _exec_command(ssh: paramiko.SSHClient, command: str) -> str:
-        """Выполнить команду через SSH и вернуть stdout."""
-        logger.debug(f"SSH Exec: {command}")
-        _, stdout, stderr = ssh.exec_command(command, timeout=120) # Больше таймаут для установки
+        """Execute command via SSH, return stdout. Raises RuntimeError on non-zero exit."""
+        logger.debug("SSH Exec: %s", command[:200])
+        _, stdout, stderr = ssh.exec_command(command, timeout=120)
         output = stdout.read().decode("utf-8").strip()
         errors = stderr.read().decode("utf-8").strip()
-        if errors and "warning" not in errors.lower() and "apt" not in errors.lower():
-            logger.warning("SSH stderr: %s", errors)
+        exit_code = stdout.channel.recv_exit_status()
+        if exit_code != 0:
+            raise RuntimeError(
+                "Command failed (exit=%d): %s\nstderr: %s" % (exit_code, command[:200], errors[:500]),
+            )
+        if errors and "WARNING" not in errors:
+            logger.warning("SSH stderr: %s", errors[:200])
         return output
 
     # ── Server Provisioning ──────────────────────────────────────────
@@ -155,7 +160,82 @@ class ServerManager:
             None, partial(self._deploy_awg_server_sync, server, kwargs),
         )
 
+    @staticmethod
+    def _sftp_put_text(ssh: paramiko.SSHClient, remote_path: str, content: str):
+        """Upload text content to remote file via SFTP."""
+        sftp = ssh.open_sftp()
+        try:
+            with sftp.file(remote_path, "w") as f:
+                f.write(content)
+        finally:
+            sftp.close()
+
+    def _build_awg_server_conf(self, server: Server, awg_params: dict) -> str:
+        """Build awg0.conf server config from AWG 2.0 params."""
+        lines = ["[Interface]"]
+        lines.append("Address = 10.0.0.1/24")
+        lines.append("ListenPort = %s" % (server.awg_listen_port or 39743))
+        # AWG 2.0 obfuscation params
+        for key in ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4"):
+            if key in awg_params:
+                lines.append("%s = %s" % (key, awg_params[key]))
+        if "I1" in awg_params:
+            lines.append("I1 = %s" % awg_params["I1"])
+
+        if server.ipv6_enabled:
+            ipv6_sub = server.ipv6_subnet or DEFAULT_IPV6_SUBNET
+            ipv6_addr = ipv6_sub.rstrip("/64").rstrip(":") + "::1/64"
+            lines.append("Address = %s" % ipv6_addr)
+
+        lines.append("")
+        lines.append("PostUp = iptables -I FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE")
+        lines.append("PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE")
+        if server.ipv6_enabled:
+            lines.append("PostUp = ip6tables -I FORWARD -i %i -j ACCEPT; ip6tables -t nat -A POSTROUTING -o eth0 -j MASQUERADE")
+            lines.append("PostDown = ip6tables -D FORWARD -i %i -j ACCEPT; ip6tables -t nat -D POSTROUTING -o eth0 -j MASQUERADE")
+        lines.append("")
+        return "\n".join(lines)
+
+    def _build_awg_server_systemd(self, server: Server, awg_params: dict, token: str) -> str:
+        """Build awg-server systemd unit with full AWG 2.0 environment."""
+        listen_port = str(server.awg_listen_port or 39743)
+        lines = [
+            "[Unit]",
+            "Description=AmneziaWG REST API Server",
+            "After=awg-quick@awg0.service",
+            "Requires=awg-quick@awg0.service",
+            "",
+            "[Service]",
+            "Type=simple",
+            "ExecStart=/usr/local/bin/awg-server",
+            "Restart=always",
+            "RestartSec=5",
+            "Environment=AWG_API_TOKEN=%s" % token,
+            "Environment=AWG_ADDRESS=10.0.0.1/24",
+            "Environment=AWG_ENDPOINT=%s" % server.host,
+            "Environment=AWG_PORT=%s" % listen_port,
+        ]
+        for key in ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4", "I1"):
+            val = awg_params.get(key, "")
+            lines.append("Environment=AWG_%s=%s" % (key.upper(), val))
+        lines.extend([
+            "",
+            "[Install]",
+            "WantedBy=multi-user.target",
+        ])
+        return "\n".join(lines) + "\n"
+
     def _deploy_awg_server_sync(self, server: Server, kwargs: dict) -> str:
+        """Deploy AmneziaWG 2.0 + awg-server on a pristine Debian/Ubuntu VPS.
+
+        Steps:
+        1. bivlked installer (non-interactive, kernel module + tools)
+        2. Enable IP forwarding (v4 + optional v6)
+        3. Generate awg0.conf in Python, upload via SFTP
+        4. Hot-reload AWG config
+        5. Install awg-server binary + systemd unit
+        6. Start and verify
+        """
         ssh = self._get_ssh_client(server)
         token = server.api_token
         if not token:
@@ -169,122 +249,105 @@ class ServerManager:
             server.awg_preset = preset_name
 
         awg_params = json.loads(server.awg_params) if server.awg_params else {}
-        awg_ini = awg2_params_to_ini(awg_params)
         preset_val = server.awg_preset or "default"
-        port_val = server.port or 39743
-        ipv6_on = "true" if server.ipv6_enabled else "false"
-        ipv6_sub = server.ipv6_subnet or DEFAULT_IPV6_SUBNET
+        listen_port = server.awg_listen_port or 39743
+
+        logs: list[str] = []
 
         try:
-            install_script = (
-                "set -e\n"
-                "export DEBIAN_FRONTEND=noninteractive\n"
-                "apt update && apt install -y curl ipset iptables iproute2\n"
-                "\n"
-                "# 1. Install AWG 2.0 kernel module + tools via bivlked installer\n"
-                "if ! lsmod | grep -q amneziawg; then\n"
-                "    cd /tmp\n"
-                "    curl -fsSL https://raw.githubusercontent.com/bivlked/amneziawg-installer/main/install_amneziawg.sh -o install_awg.sh\n"
-                "    bash install_awg.sh --preset=%s --port=%s --yes --route-amnezia --no-tweaks\n"
-                "fi\n"
-                "\n"
-                "# 2. Enable IP forwarding + IPv6\n"
+            # ── Step 1: bivlked installer ──────────────────────────
+            if not kwargs.get("skip_installer"):
+                logger.info("[%s] Step 1/6: Installing AWG 2.0 via bivlked installer", server.name)
+                installer_cmd = (
+                    "set -e; export DEBIAN_FRONTEND=noninteractive\n"
+                    "apt-get update -qq && apt-get install -y -qq curl ipset iptables iproute2\n"
+                    "if ! lsmod | grep -q amneziawg; then\n"
+                    "  cd /tmp\n"
+                    "  curl -fsSL https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.14.1/install_amneziawg.sh -o install_awg.sh\n"
+                    "  bash install_awg.sh --preset=%s --port=%s --yes --route-amnezia --no-tweaks\n"
+                    "fi\n"
+                ) % (preset_val, listen_port)
+                out = self._exec_command(ssh, installer_cmd)
+                logs.append("installer: ok")
+
+            # ── Step 2: IP forwarding ──────────────────────────────
+            logger.info("[%s] Step 2/6: Enabling IP forwarding", server.name)
+            fwd_script = (
                 "sysctl -w net.ipv4.ip_forward=1\n"
                 "echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-ipforward.conf\n"
-                "IPV6_ON=%s\n"
-                'IPV6_SUB=%s\n'
-                'IPV6_IF=""\n'
-                'if [ "$IPV6_ON" = "true" ]; then\n'
-                '    IPV6_IF=$(ip -6 route show default 2>/dev/null | awk '"'"'{print $5}'"'"' | head -1)\n'
-                '    if [ -n "$IPV6_IF" ]; then\n'
-                '        sysctl -w net.ipv6.conf.all.forwarding=1\n'
-                '        IPV6_ADDR=$(echo "$IPV6_SUB" | sed "s|/64|::1/64|")\n'
-                '    fi\n'
-                'fi\n'
-                "\n"
-                "# 3. Generate awg0.conf with AWG 2.0 params\n"
-                "cat > /etc/amnezia/amneziawg/awg0.conf << 'AWGCONF'\n"
-                "[Interface]\n"
-                "PrivateKey = $(cat /root/awg/server_private.key)\n"
-                "Address = 10.0.0.1/24\n"
-                'if [ "$IPV6_ON" = "true" ] && [ -n "$IPV6_IF" ]; then\n'
-                '    echo "Address = $IPV6_ADDR" >> /etc/amnezia/amneziawg/awg0.conf\n'
-                'fi\n'
-                "ListenPort = %s\n"
-                "%s\n"
-                "\n"
-                "PostUp = iptables -I FORWARD -i %%i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE\n"
-                "PostDown = iptables -D FORWARD -i %%i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE\n"
-                'if [ "$IPV6_ON" = "true" ] && [ -n "$IPV6_IF" ]; then\n'
-                '    echo "PostUp = ip6tables -I FORWARD -i %%i -j ACCEPT; ip6tables -t nat -A POSTROUTING -o $IPV6_IF -j MASQUERADE" >> /etc/amnezia/amneziawg/awg0.conf\n'
-                '    echo "PostDown = ip6tables -D FORWARD -i %%i -j ACCEPT; ip6tables -t nat -D POSTROUTING -o $IPV6_IF -j MASQUERADE" >> /etc/amnezia/amneziawg/awg0.conf\n'
-                'fi\n'
-                "AWGCONF\n"
-                "\n"
-                "# 4. Hot-reload via syncconf\n"
-                "awg syncconf awg0 || systemctl restart awg-quick@awg0\n"
-                "\n"
-                "# 5. REST API wrapper (awg-server with AWG 2.0 env)\n"
-                'curl -fsSL https://github.com/stealthsurf-vpn/awg-server/releases/latest/download/awg-server-linux-$(uname -m | sed "s/x86_64/amd64/" | sed "s/aarch64/arm64/") -o /usr/local/bin/awg-server\n'
+            )
+            if server.ipv6_enabled:
+                fwd_script += (
+                    "sysctl -w net.ipv6.conf.all.forwarding=1\n"
+                    "echo 'net.ipv6.conf.all.forwarding=1' >> /etc/sysctl.d/99-ipforward.conf\n"
+                )
+            self._exec_command(ssh, fwd_script)
+            logs.append("ip_forward: ok")
+
+            # ── Step 3: Generate and upload awg0.conf ──────────────
+            logger.info("[%s] Step 3/6: Uploading awg0.conf", server.name)
+            server_conf = self._build_awg_server_conf(server, awg_params)
+            # Fetch or generate server private key
+            key_cmd = "cat /root/awg/server_private.key 2>/dev/null || awg genkey"
+            server_key = self._exec_command(ssh, key_cmd).strip()
+            if not server_key:
+                raise RuntimeError("Failed to get/generate server private key")
+            # Save key if just generated
+            self._exec_command(
+                ssh,
+                "mkdir -p /root/awg && echo '%s' > /root/awg/server_private.key" % server_key,
+            )
+            # Build final config with key
+            final_conf = "PrivateKey = %s\n" % server_key + server_conf
+            self._sftp_put_text(ssh, "/etc/amnezia/amneziawg/awg0.conf", final_conf)
+            logs.append("awg0.conf: uploaded")
+
+            # ── Step 4: Hot-reload AWG ─────────────────────────────
+            logger.info("[%s] Step 4/6: Hot-reloading AWG config", server.name)
+            out = self._exec_command(
+                ssh,
+                "awg syncconf awg0 2>/dev/null || systemctl restart awg-quick@awg0",
+            )
+            logs.append("syncconf: %s" % (out[:80] if out else "ok"))
+
+            # ── Step 5: Install awg-server binary ──────────────────
+            logger.info("[%s] Step 5/6: Installing awg-server binary", server.name)
+            arch_detect = 'uname -m | sed "s/x86_64/amd64/" | sed "s/aarch64/arm64/"'
+            awg_server_url = (
+                "https://github.com/stealthsurf-vpn/awg-server/releases/latest/download/"
+                "awg-server-linux-$(%s)" % arch_detect
+            )
+            out = self._exec_command(ssh, (
+                "curl -fsSL '%s' -o /usr/local/bin/awg-server\n"
                 "chmod +x /usr/local/bin/awg-server\n"
-                "\n"
-                "cat > /etc/systemd/system/awg-server.service << 'EOF'\n"
-                "[Unit]\n"
-                "Description=AmneziaWG REST API Server\n"
-                "After=awg-quick@awg0.service\n"
-                "Requires=awg-quick@awg0.service\n"
-                "\n"
-                "[Service]\n"
-                "Type=simple\n"
-                "ExecStart=/usr/local/bin/awg-server\n"
-                "Restart=always\n"
-                "RestartSec=5\n"
-                "Environment=AWG_API_TOKEN=%s\n"
-                "Environment=AWG_ADDRESS=10.0.0.1/24\n"
-                "Environment=AWG_ENDPOINT=%s\n"
-                "Environment=AWG_PORT=%s\n"
-                "Environment=AWG_JC=%s\n"
-                "Environment=AWG_JMIN=%s\n"
-                "Environment=AWG_JMAX=%s\n"
-                "Environment=AWG_S1=%s\n"
-                "Environment=AWG_S2=%s\n"
-                "Environment=AWG_S3=%s\n"
-                "Environment=AWG_S4=%s\n"
-                "Environment=AWG_H1=%s\n"
-                "Environment=AWG_H2=%s\n"
-                "Environment=AWG_H3=%s\n"
-                "Environment=AWG_H4=%s\n"
-                "Environment=AWG_I1=%s\n"
-                "\n"
-                "[Install]\n"
-                "WantedBy=multi-user.target\n"
-                "EOF\n"
-                "\n"
+                "echo 'installed'"
+            ) % awg_server_url)
+            logs.append("awg-server: %s" % out.strip())
+
+            # ── Step 6: Systemd unit + start ───────────────────────
+            logger.info("[%s] Step 6/6: Starting awg-server service", server.name)
+            unit_content = self._build_awg_server_systemd(server, awg_params, token)
+            self._sftp_put_text(ssh, "/etc/systemd/system/awg-server.service", unit_content)
+            out = self._exec_command(ssh, (
                 "systemctl daemon-reload\n"
                 "systemctl enable --now awg-server\n"
-            ) % (
-                preset_val, port_val,
-                ipv6_on, ipv6_sub,
-                port_val, awg_ini,
-                token, server.host, str(port_val),
-                str(awg_params.get("Jc", 5)),
-                str(awg_params.get("Jmin", 50)),
-                str(awg_params.get("Jmax", 1000)),
-                str(awg_params.get("S1", 72)),
-                str(awg_params.get("S2", 56)),
-                str(awg_params.get("S3", 32)),
-                str(awg_params.get("S4", 16)),
-                str(awg_params.get("H1", "234567-345678")),
-                str(awg_params.get("H2", "3456789-4567890")),
-                str(awg_params.get("H3", "56789012-67890123")),
-                str(awg_params.get("H4", "456789012-567890123")),
-                str(awg_params.get("I1", "<r 128>")),
+                "sleep 2\n"
+                "systemctl is-active awg-server && echo 'ACTIVE' || echo 'FAILED'"
+            ))
+            logs.append("service: %s" % out.strip())
+
+            # Save API URL for future use
+            if not server.api_url:
+                server.api_url = "http://127.0.0.1:7777"
+
+            logger.info(
+                "[%s] AWG 2.0 deployed: preset=%s port=%s | %s",
+                server.name, server.awg_preset, listen_port, " | ".join(logs),
             )
-            output = self._exec_command(ssh, install_script)
-            logger.info("AWG 2.0 deployed on %s (preset=%s)", server.name, server.awg_preset)
-            return output
+            return "\n".join(logs)
+
         except Exception as e:
-            logger.error("Deploy awg-server failed on %s: %s", server.name, e)
+            logger.error("[%s] Deploy failed: %s", server.name, e)
             raise
         finally:
             ssh.close()
@@ -297,54 +360,62 @@ class ServerManager:
         )
 
     def _setup_split_routing_sync(self, server: Server, tunnel_interface: str) -> str:
+        """Split routing: RU sites + YouTube → direct, everything else → tunnel.
+
+        Uses two ipsets: ru_ips (all Russian IPv4) and direct_ips (RU + YouTube).
+        Traffic matching direct_ips goes out directly (eth0).
+        Everything else is marked 0x1 and routed through the tunnel interface.
+        """
         ssh = self._get_ssh_client(server)
         try:
-            # 1. Скачиваем списки RU IP
-            # 2. Создаем ipset и добавляем туда
-            # 3. Маркируем трафик, кроме RU
-            # 4. Направляем маркированный в таблицу моста
-            script = f"""
+            script = """#!/bin/bash
             set -e
-            apt install -y ipset iptables iproute2 curl wget
-
-            # Create or flush ipset
-            ipset create ru_ips hash:net || ipset flush ru_ips
-
-            # Download RU subnets
-            curl -sL https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv4/ru.cidr > /tmp/ru.cidr
-            
-            # Load into ipset efficiently
-            sed -e "s/^/add ru_ips /" /tmp/ru.cidr > /tmp/ru_ipset.restore
-            ipset restore -exist < /tmp/ru_ipset.restore || true
-
-            # Table for bridge
-            if ! grep -q "100 vpn_bridge" /etc/iproute2/rt_tables; then
-                echo "100 vpn_bridge" >> /etc/iproute2/rt_tables
-            fi
-
-            # Add default route for marked packets to tunnel interface
-            # Note: tunnel_interface (e.g. awg1) must exist, this might fail if not created yet.
-            ip route add default dev {tunnel_interface} table vpn_bridge || true
-            ip rule add fwmark 0x1 table vpn_bridge || true
-
-            # Mangle rules for traffic from client interfaces (awg0)
-            # Find client interface (default awg0)
+            apt-get install -y -qq ipset iptables iproute2 curl
             CLIENT_IF="awg0"
-            iptables -t mangle -F PREROUTING || true
-            iptables -t mangle -A PREROUTING -i $CLIENT_IF -m set --match-set ru_ips dst -j RETURN
+
+            # ── ipset: ru_ips (all Russian subnets) ──────────────────
+            ipset create ru_ips hash:net -exist
+            ipset flush ru_ips
+            curl -sL https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv4/ru.cidr > /tmp/ru.cidr
+            sed -e "s/^/add ru_ips /" /tmp/ru.cidr > /tmp/ru_restore.txt
+            ipset restore -exist < /tmp/ru_restore.txt
+
+            # ── ipset: youtube_ips (Google/YouTube CDN) ──────────────
+            ipset create youtube_ips hash:net -exist
+            ipset flush youtube_ips
+            # Static YouTube CDN ranges (updated manually)
+            for cidr in 173.194.0.0/16 74.125.0.0/16 216.58.192.0/19 142.250.0.0/15 142.251.0.0/16 172.217.0.0/16 64.233.160.0/19 66.249.80.0/20 72.14.192.0/18 209.85.128.0/17 66.102.0.0/20 35.190.0.0/17; do
+                ipset add youtube_ips $cidr -exist
+            done
+
+            # ── ipset: direct_ips = ru_ips ∪ youtube_ips ────────────
+            ipset create direct_ips list:set -exist
+            ipset flush direct_ips
+            ipset add direct_ips ru_ips -exist
+            ipset add direct_ips youtube_ips -exist
+
+            # ── Routing table for tunnel ────────────────────────────
+            grep -q "100 vpn_bridge" /etc/iproute2/rt_tables || echo "100 vpn_bridge" >> /etc/iproute2/rt_tables
+            ip route replace default dev {tunnel_if} table vpn_bridge 2>/dev/null || ip route add default dev {tunnel_if} table vpn_bridge
+            ip rule add fwmark 0x1 table vpn_bridge 2>/dev/null || true
+
+            # ── Mangle: direct_ips → RETURN (go direct), rest → MARK 0x1 (tunnel) ──
+            iptables -t mangle -F PREROUTING 2>/dev/null || true
+            iptables -t mangle -A PREROUTING -i $CLIENT_IF -m set --match-set direct_ips dst -j RETURN
             iptables -t mangle -A PREROUTING -i $CLIENT_IF -j MARK --set-mark 0x1
 
-            # NAT MASQUERADE
-            iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE || true
-            iptables -t nat -A POSTROUTING -o ens3 -j MASQUERADE || true
-            iptables -t nat -A POSTROUTING -o $CLIENT_IF -j MASQUERADE || true
-            iptables -t nat -A POSTROUTING -o {tunnel_interface} -j MASQUERADE || true
-            """
+            # ── NAT MASQUERADE on all outbound interfaces ───────────
+            for iface in eth0 ens3 $CLIENT_IF {tunnel_if}; do
+                iptables -t nat -C POSTROUTING -o $iface -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o $iface -j MASQUERADE
+            done
+
+            echo "Split routing: RU+YouTube=direct, rest=tunnel({tunnel_if})"
+            """.format(tunnel_if=tunnel_interface)
             output = self._exec_command(ssh, script)
-            logger.info("Сплит-роутинг настроен на %s", server.name)
+            logger.info("[%s] Split routing configured: RU+YouTube direct, foreign via %s", server.name, tunnel_interface)
             return output
         except Exception as e:
-            logger.error("Ошибка сплит-роутинга на %s: %s", server.name, e)
+            logger.error("[%s] Split routing failed: %s", server.name, e)
             raise
         finally:
             ssh.close()
@@ -503,30 +574,30 @@ class ServerManager:
         )
 
     def _deploy_tunnel_endpoint_sync(self, foreign, local_subnet, listen_port, preset):
-        ssh = self._get_ssh_client(foreign)
-        if not listen_port:
-            listen_port = random.randint(30000, 50000)
-
-        params, preset_name = generate_awg2_params(preset)
-        awg_ini = awg2_params_to_ini(params)
-
-        server_key = self._exec_command(
-            ssh, "cat /root/awg/server_private.key 2>/dev/null || echo 'NEED_INSTALL'",
-        )
-        if "NEED_INSTALL" in server_key:
-            self._exec_command(ssh, (
-                "set -e\n"
-                "export DEBIAN_FRONTEND=noninteractive\n"
-                "apt update && apt install -y curl\n"
-                "cd /tmp\n"
-                "curl -fsSL https://raw.githubusercontent.com/bivlked/amneziawg-installer/main/install_amneziawg.sh -o install_awg.sh\n"
-                "bash install_awg.sh --preset=%s --port=%s --yes --route-amnezia --no-tweaks\n"
-            ) % (preset_name, listen_port))
-            server_key = self._exec_command(ssh, "cat /root/awg/server_private.key").strip()
-
-        server_pub = self._exec_command(ssh, "echo '%s' | awg pubkey" % server_key).strip()
-
+        ssh = None
         try:
+            ssh = self._get_ssh_client(foreign)
+            if not listen_port:
+                listen_port = random.randint(30000, 50000)
+
+            params, preset_name = generate_awg2_params(preset)
+            awg_ini = awg2_params_to_ini(params)
+
+            server_key = self._exec_command(
+                ssh, "cat /root/awg/server_private.key 2>/dev/null || echo 'NEED_INSTALL'",
+            )
+            if "NEED_INSTALL" in server_key:
+                self._exec_command(ssh, (
+                    "set -e\n"
+                    "export DEBIAN_FRONTEND=noninteractive\n"
+                    "apt update && apt install -y curl\n"
+                    "cd /tmp\n"
+                    "curl -fsSL https://raw.githubusercontent.com/bivlked/amneziawg-installer/main/install_amneziawg.sh -o install_awg.sh\n"
+                    "bash install_awg.sh --preset=%s --port=%s --yes --route-amnezia --no-tweaks\n"
+                ) % (preset_name, listen_port))
+                server_key = self._exec_command(ssh, "cat /root/awg/server_private.key").strip()
+
+            server_pub = self._exec_command(ssh, "echo '%s' | awg pubkey" % server_key).strip()
             tun_conf = (
                 "mkdir -p /etc/amnezia/amneziawg/\n"
                 "cat > /etc/amnezia/amneziawg/awg0.conf << 'TUNEOF'\n"
@@ -548,7 +619,8 @@ class ServerManager:
                 "listen_port": listen_port,
             }
         finally:
-            ssh.close()
+            if ssh:
+                ssh.close()
 
     async def setup_tunnel_client(self, russian_server, foreign_endpoint,
                                   foreign_pubkey, local_subnet, awg_params,
@@ -563,14 +635,14 @@ class ServerManager:
 
     def _setup_tunnel_client_sync(self, russian, foreign_endpoint, foreign_pubkey,
                                   local_subnet, awg_params, tunnel_interface):
-        ssh = self._get_ssh_client(russian)
-        client_key = self._exec_command(ssh, "awg genkey").strip()
-        client_pub = self._exec_command(ssh, "echo '%s' | awg pubkey" % client_key).strip()
-        awg_ini = awg2_params_to_ini(awg_params)
-        base_ip = local_subnet.rsplit(".", 2)[0]
-        client_ip = "%s.2/24" % base_ip
-
+        ssh = None
         try:
+            ssh = self._get_ssh_client(russian)
+            client_key = self._exec_command(ssh, "awg genkey").strip()
+            client_pub = self._exec_command(ssh, "echo '%s' | awg pubkey" % client_key).strip()
+            awg_ini = awg2_params_to_ini(awg_params)
+            base_ip = local_subnet.rsplit(".", 2)[0]
+            client_ip = "%s.2/24" % base_ip
             tun_client = (
                 "cat > /etc/amnezia/amneziawg/%s.conf << 'TUNCLIENTEOF'\n"
                 "[Interface]\n"
@@ -593,7 +665,8 @@ class ServerManager:
                         tunnel_interface, russian.name, foreign_endpoint)
             return client_pub
         finally:
-            ssh.close()
+            if ssh:
+                ssh.close()
 
     async def add_tunnel_peer(self, foreign_server, client_pubkey,
                               client_ip="10.10.0.2/32"):

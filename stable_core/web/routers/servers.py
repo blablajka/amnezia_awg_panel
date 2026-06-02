@@ -45,6 +45,8 @@ async def add_server(
     ssh_password: str = Form(""),
     country_code: str = Form("DK"),
     preset: str = Form("default"),
+    awg_listen_port: int = Form(39743),
+    ipv6_enabled: bool = Form(False),
 ):
     token = get_session_token(request)
     if not verify_session(token):
@@ -56,6 +58,8 @@ async def add_server(
             port=port, ssh_user=ssh_user,
             ssh_password=ssh_password or None,
             protocol="awg", awg_preset=preset,
+            awg_listen_port=awg_listen_port,
+            ipv6_enabled=ipv6_enabled,
         )
         try:
             await sm.deploy_awg_server(server, preset=preset)
@@ -72,3 +76,58 @@ async def add_server(
         f"{settings.ADMIN_PATH}/servers?added=1",
         status_code=302,
     )
+
+
+@router.post("/{server_id}/syncconf")
+async def sync_server_config(request: Request, server_id: int):
+    """Hot-reload AWG config on server (awg syncconf)."""
+    token = get_session_token(request)
+    if not verify_session(token):
+        return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
+
+    async with async_session_factory() as session:
+        server = await crud.get_server_by_id(session, server_id)
+        if not server:
+            return RedirectResponse(f"{settings.ADMIN_PATH}/servers?error=notfound", status_code=302)
+
+        from services.protocols.awg import AwgProtocolHandler
+        awg = AwgProtocolHandler(sm)
+        try:
+            result = await awg.syncconf(server)
+            logger.info("syncconf on %s: %s", server.name, result[:100])
+        except Exception as e:
+            logger.error("syncconf failed on %s: %s", server.name, e)
+            return RedirectResponse(
+                f"{settings.ADMIN_PATH}/servers?error=syncconf_failed",
+                status_code=302,
+            )
+
+    return RedirectResponse(f"{settings.ADMIN_PATH}/servers?synced=1", status_code=302)
+
+
+@router.post("/{server_id}/delete")
+async def delete_server(request: Request, server_id: int):
+    """Delete server and deactivate all associated UserServer records."""
+    token = get_session_token(request)
+    if not verify_session(token):
+        return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
+
+    async with async_session_factory() as session:
+        server = await crud.get_server_by_id(session, server_id)
+        if not server:
+            return RedirectResponse(f"{settings.ADMIN_PATH}/servers?error=notfound", status_code=302)
+
+        # Deactivate all user configs on this server
+        from sqlalchemy import update
+        from database.models import UserServer
+        await session.execute(
+            update(UserServer)
+            .where(UserServer.server_id == server_id)
+            .values(is_active=False)
+        )
+        server.is_active = False
+        await session.delete(server)
+        await session.commit()
+        logger.info("Server %s deleted", server.name)
+
+    return RedirectResponse(f"{settings.ADMIN_PATH}/servers?deleted=1", status_code=302)

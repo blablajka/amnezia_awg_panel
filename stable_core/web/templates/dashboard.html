@@ -59,6 +59,15 @@
         </div>
     </div>
 
+    <!-- Revenue Chart -->
+    <div class="glass rounded-2xl p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">
+            <i class="fas fa-chart-line text-brand-400 mr-2"></i>
+            Доход и пользователи по дням
+        </h2>
+        <canvas id="revenueChart" height="80"></canvas>
+    </div>
+
     <!-- Recent Stats Table -->
     <div class="glass rounded-2xl p-6">
         <h2 class="text-lg font-semibold text-white mb-4">
@@ -99,4 +108,63 @@
         {% endif %}
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+{% if daily_stats %}
+(function() {
+    var ctx = document.getElementById('revenueChart').getContext('2d');
+    var stats = [
+        {% for s in daily_stats|reverse %}
+        { date: '{{ s.date.strftime("%d.%m") }}', revenue: {{ s.revenue }}, users: {{ s.new_users }} }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: stats.map(function(s) { return s.date; }),
+            datasets: [
+                {
+                    label: 'Revenue (₽)',
+                    data: stats.map(function(s) { return s.revenue; }),
+                    borderColor: '#a78bfa',
+                    backgroundColor: 'rgba(167,139,250,0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y',
+                },
+                {
+                    label: 'New Users',
+                    data: stats.map(function(s) { return s.users; }),
+                    borderColor: '#60a5fa',
+                    backgroundColor: 'rgba(96,165,250,0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y1',
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { labels: { color: '#9ca3af' } } },
+            scales: {
+                x: { ticks: { color: '#6b7280' }, grid: { color: 'rgba(75,85,99,0.2)' } },
+                y: {
+                    type: 'linear', display: true, position: 'left',
+                    ticks: { color: '#a78bfa', callback: function(v) { return v + '₽'; } },
+                    grid: { color: 'rgba(75,85,99,0.2)' }
+                },
+                y1: {
+                    type: 'linear', display: true, position: 'right',
+                    ticks: { color: '#60a5fa' },
+                    grid: { drawOnChartArea: false }
+                }
+            }
+        }
+    });
+})();
+{% endif %}
+</script>
 {% endblock %}
