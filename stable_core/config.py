@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     ADMIN_PATH: str = "/admin"  # Защищенный путь к панели
     SECRET_KEY: str = "change-me-in-production-please"
     ADMIN_USERNAME: str = "admin"
-    ADMIN_PASSWORD: str = "admin"  # В продакшне — хэш bcrypt
+    ADMIN_PASSWORD: str = "vpn2026secure"  # Change in production via .env
 
     # ── Реферальная система ──────────────────────────────────────────────
     REFERRAL_BONUS_DAYS: int = 3  # Дней подписки за приглашённого друга

@@ -8,9 +8,8 @@ echo "================================================="
 export DEBIAN_FRONTEND=noninteractive
 
 REPO_URL="${REPO_URL:-https://github.com/blablajka/amnezia_awg_panel.git}"
-BOT_TOKEN="${BOT_TOKEN:-dummy_token_to_allow_startup}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-vpn2026secure}"
 WEB_PORT="${WEB_PORT:-8000}"
 
 echo "=> Installing dependencies..."
@@ -26,7 +25,15 @@ echo "=> Generating config..."
 ADMIN_UUID="${ADMIN_PATH:-/$(cat /proc/sys/kernel/random/uuid)}"
 SECRET_KEY=$(head -c 32 /dev/urandom | base64 | tr -d '\n')
 
-cat > .env << ENVEOF
+# Use BOT_TOKEN from env, or from existing .env, or fallback to dummy
+if [ -z "$BOT_TOKEN" ] && [ -f .env ]; then
+    BOT_TOKEN=$(grep -oP 'BOT_TOKEN=\K.+' .env 2>/dev/null | head -1)
+fi
+BOT_TOKEN="${BOT_TOKEN:-dummy_token_to_allow_startup}"
+
+# Only create .env if missing or has placeholder token
+if [ ! -f .env ] || grep -q 'BOT_TOKEN=dummy' .env 2>/dev/null; then
+    cat > .env << ENVEOF
 BOT_TOKEN=$BOT_TOKEN
 ADMIN_IDS=[]
 DATABASE_URL=sqlite+aiosqlite:///./vpn_system.db
@@ -42,6 +49,10 @@ PRICE_1_MONTH=290
 PRICE_3_MONTHS=690
 PRICE_12_MONTHS=2490
 ENVEOF
+    echo "=> .env created with defaults"
+else
+    echo "=> .env already exists, preserving your settings"
+fi
 
 echo "=> Installing Python dependencies..."
 python3 -m venv venv
