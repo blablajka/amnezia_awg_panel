@@ -64,11 +64,10 @@ def create_web_app() -> FastAPI:
     admin_router.include_router(stats.router)
     admin_router.include_router(protocols.router)
     admin_router.include_router(bridges.router)
-    # Заглушка для корневого URL (защита от сканеров)
+    # Root URL redirects to admin login
     @app.get("/")
-    async def root_stub():
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Not Found")
+    async def root_redirect():
+        return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
 
     # ── Фоновые задачи ───────────────────────────────────────────────
 
@@ -175,3 +174,9 @@ def create_web_app() -> FastAPI:
 
     app.include_router(admin_router)
     return app
+
+
+if __name__ == "__main__":
+    import uvicorn
+    app = create_web_app()
+    uvicorn.run(app, host=settings.WEB_HOST, port=settings.WEB_PORT)
