@@ -13,7 +13,10 @@
       "Bash(git add *)",
       "Bash(echo '__pycache__/ *)",
       "Bash(sort -u .gitignore -o .gitignore)",
-      "Bash(git commit -m 'Smart VPN Panel v2 — Full AWG 2.0 + Cascade + Telegram Bot *)"
+      "Bash(git commit -m 'Smart VPN Panel v2 — Full AWG 2.0 + Cascade + Telegram Bot *)",
+      "Bash(git push *)",
+      "Bash(git commit *)",
+      "Bash(python -c ' *)"
     ]
   }
 }
