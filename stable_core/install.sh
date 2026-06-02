@@ -7,7 +7,7 @@ echo "================================================="
 
 export DEBIAN_FRONTEND=noninteractive
 
-REPO_URL="${REPO_URL:-https://github.com/blablajka/smart-vpn-panel.git}"
+REPO_URL="${REPO_URL:-https://github.com/blablajka/amnezia_awg_panel.git}"
 BOT_TOKEN="${BOT_TOKEN:-dummy_token_to_allow_startup}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
