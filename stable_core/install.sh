@@ -572,4 +572,16 @@ API Key:  $AWG_API_TOKEN
 CREDEOF
 chmod 600 "$INSTALL_DIR/CREDENTIALS.txt"
 
+# Final reboot for fresh kernel module + sysctl
+echo ""
+echo "  All components installed. Reboot ensures kernel module is fresh."
+echo ""
+read -p "  Reboot now? [Y/n]: " DO_REBOOT
+DO_REBOOT="${DO_REBOOT:-y}"
+if [ "$DO_REBOOT" = "y" ] || [ "$DO_REBOOT" = "Y" ]; then
+    echo "  Rebooting in 3s..."
+    sleep 3
+    reboot
+fi
+
 exit 0

@@ -29,7 +29,10 @@ async def protocols_page(request: Request):
 
     server_data = []
     for s in servers:
-        status = await sm.get_server_status(s)
+        try:
+            status = await sm.get_server_status(s)
+        except Exception:
+            status = {"status": "offline", "peers": 0}
         server_data.append({"server": s, "status": status})
 
     return templates.TemplateResponse(request=request, name="protocols.html", context={

@@ -9,6 +9,17 @@
         </div>
     </div>
 
+    {% if request.query_params.get('created') %}
+    <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 text-emerald-400 text-sm">
+        <i class="fas fa-check-circle mr-2"></i>Промокод создан
+    </div>
+    {% endif %}
+    {% if request.query_params.get('error') %}
+    <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+        <i class="fas fa-exclamation-circle mr-2"></i>{{ request.query_params.get('error') }}
+    </div>
+    {% endif %}
+
     <!-- Create Form -->
     <div class="glass rounded-2xl p-6">
         <h2 class="text-lg font-semibold text-white mb-4">
