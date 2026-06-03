@@ -229,6 +229,8 @@ class ServerManager:
         ])
         return "\n".join(lines) + "\n"
 
+    import shlex
+
     def _deploy_awg_server_sync(self, server: Server, kwargs: dict) -> str:
         """Deploy AmneziaWG 2.0 + awg-server + security on pristine Debian/Ubuntu VPS.
 
@@ -657,7 +659,7 @@ class ServerManager:
                     "cd /tmp\n"
                     "curl -fsSL https://raw.githubusercontent.com/bivlked/amneziawg-installer/main/install_amneziawg.sh -o install_awg.sh\n"
                     "bash install_awg.sh --preset=%s --port=%s --yes --route-amnezia --no-tweaks\n"
-                ) % (preset_name, listen_port))
+                ) % (shlex.quote(str(preset_name)), listen_port))
                 server_key = self._exec_command(ssh, "cat /root/awg/server_private.key").strip()
 
             server_pub = self._exec_command(ssh, "echo '%s' | awg pubkey" % server_key).strip()
@@ -741,8 +743,9 @@ class ServerManager:
         )
 
     def _add_tunnel_peer_sync(self, foreign, client_pubkey, client_ip):
-        ssh = self._get_ssh_client(foreign)
+        ssh = None
         try:
+            ssh = self._get_ssh_client(foreign)
             self._exec_command(ssh, (
                 "awg set awg0 peer %s allowed-ips %s\n"
                 "awg syncconf awg0 2>/dev/null || systemctl restart awg-quick@awg0\n"
@@ -797,8 +800,9 @@ class ServerManager:
         )
 
     def __setup_full_tunnel_sync(self, russian, tunnel_if):
-        ssh = self._get_ssh_client(russian)
+        ssh = None
         try:
+            ssh = self._get_ssh_client(russian)
             self._exec_command(ssh, (
                 "set -e\n"
                 "grep -q '200 tunnel_out' /etc/iproute2/rt_tables || echo '200 tunnel_out' >> /etc/iproute2/rt_tables\n"

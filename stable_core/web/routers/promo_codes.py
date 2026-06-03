@@ -33,10 +33,15 @@ async def create_promo(
     token = get_session_token(request)
     if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
-    async with async_session_factory() as session:
-        await PromoService.create_promo(
-            session=session, code=code,
-            discount_percent=discount_percent, max_uses=max_uses,
-        )
-        await session.commit()
-    return RedirectResponse(f"{settings.ADMIN_PATH}/promo-codes", status_code=302)
+    try:
+        async with async_session_factory() as session:
+            await PromoService.create_promo(
+                session=session, code=code,
+                discount_percent=discount_percent, max_uses=max_uses,
+            )
+            await session.commit()
+            logger.info("Promo created: %s", code)
+    except Exception as e:
+        logger.error("Promo create failed: %s", e)
+        return RedirectResponse(f"{settings.ADMIN_PATH}/promo-codes?error=create_failed", status_code=302)
+    return RedirectResponse(f"{settings.ADMIN_PATH}/promo-codes?created=1", status_code=302)

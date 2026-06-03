@@ -314,8 +314,8 @@ class Payment(Base):
 
     # ── Relationships ────────────────────────────────────────────────
     user: Mapped[User] = relationship(back_populates="payments")
-    subscription: Mapped[Optional[Subscription]] = relationship(back_populates="payments")
-    promo_code: Mapped[Optional[PromoCode]] = relationship(back_populates="payments")
+    subscription: Mapped[Optional[Subscription]] = relationship(back_populates="payments", lazy="selectin")
+    promo_code: Mapped[Optional[PromoCode]] = relationship(back_populates="payments", lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<Payment id={self.id} yk={self.yookassa_payment_id} status={self.status}>"
