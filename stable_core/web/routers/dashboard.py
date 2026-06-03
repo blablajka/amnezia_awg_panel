@@ -21,7 +21,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 async def dashboard_page(request: Request):
     """Dashboard with live server health checks."""
     token = get_session_token(request)
-    if not verify_session(token):
+    if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
 
     templates = request.app.state.templates

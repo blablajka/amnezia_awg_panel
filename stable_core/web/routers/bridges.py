@@ -19,7 +19,7 @@ sm = ServerManager()
 @router.get("", response_class=HTMLResponse)
 async def bridges_page(request: Request):
     token = get_session_token(request)
-    if not verify_session(token):
+    if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
     templates = request.app.state.templates
 
@@ -44,7 +44,7 @@ async def create_bridge(
     preset: str = Form("default"),
 ):
     token = get_session_token(request)
-    if not verify_session(token):
+    if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
 
     async with async_session_factory() as session:
@@ -97,7 +97,7 @@ async def create_bridge(
 @router.post("/delete")
 async def delete_bridge(request: Request, bridge_id: int = Form(...)):
     token = get_session_token(request)
-    if not verify_session(token):
+    if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
 
     async with async_session_factory() as session:
@@ -110,7 +110,7 @@ async def delete_bridge(request: Request, bridge_id: int = Form(...)):
 @router.post("/toggle")
 async def toggle_bridge(request: Request, bridge_id: int = Form(...)):
     token = get_session_token(request)
-    if not verify_session(token):
+    if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
 
     async with async_session_factory() as session:

@@ -17,7 +17,7 @@ sm = ServerManager()
 @router.get("", response_class=HTMLResponse)
 async def servers_page(request: Request):
     token = get_session_token(request)
-    if not verify_session(token):
+    if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
     templates = request.app.state.templates
     async with async_session_factory() as session:
@@ -49,7 +49,7 @@ async def add_server(
     ipv6_enabled: bool = Form(False),
 ):
     token = get_session_token(request)
-    if not verify_session(token):
+    if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
 
     async with async_session_factory() as session:
@@ -82,7 +82,7 @@ async def add_server(
 async def sync_server_config(request: Request, server_id: int):
     """Hot-reload AWG config on server (awg syncconf)."""
     token = get_session_token(request)
-    if not verify_session(token):
+    if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
 
     async with async_session_factory() as session:
@@ -109,7 +109,7 @@ async def sync_server_config(request: Request, server_id: int):
 async def delete_server(request: Request, server_id: int):
     """Delete server and deactivate all associated UserServer records."""
     token = get_session_token(request)
-    if not verify_session(token):
+    if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
 
     async with async_session_factory() as session:

@@ -4,6 +4,7 @@ Sessions survive server restarts via JSON file in /data/sessions.json.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import secrets
 import time
@@ -15,9 +16,10 @@ from fastapi.responses import RedirectResponse
 
 from config import settings
 
-# File-backed session store (survives restarts)
+# File-backed session store (survives restarts, thread-safe)
 SESSIONS_FILE = Path("/data/sessions.json")
 _sessions: dict[str, dict[str, Any]] = {}
+_sessions_lock = asyncio.Lock()
 
 # Max session age: 7 days
 SESSION_MAX_AGE = 86400 * 7
@@ -54,33 +56,35 @@ def _save_sessions() -> None:
 _load_sessions()
 
 
-def create_session(username: str) -> str:
+async def create_session(username: str) -> str:
     """Create new session, return token."""
     token = secrets.token_urlsafe(32)
-    _sessions[token] = {"username": username, "_created": time.time()}
-    _save_sessions()
+    async with _sessions_lock:
+        _sessions[token] = {"username": username, "_created": time.time()}
+        _save_sessions()
     return token
 
 
-def verify_session(token: str | None) -> bool:
+async def verify_session(token: str | None) -> bool:
     """Check if session is valid."""
     if not token:
         return False
-    session = _sessions.get(token)
-    if not session:
-        return False
-    # Check expiry
-    if session.get("_created", 0) + SESSION_MAX_AGE < time.time():
+    async with _sessions_lock:
+        session = _sessions.get(token)
+        if not session:
+            return False
+        if session.get("_created", 0) + SESSION_MAX_AGE < time.time():
+            _sessions.pop(token, None)
+            _save_sessions()
+            return False
+        return True
+
+
+async def delete_session(token: str) -> None:
+    """Remove session."""
+    async with _sessions_lock:
         _sessions.pop(token, None)
         _save_sessions()
-        return False
-    return True
-
-
-def delete_session(token: str) -> None:
-    """Remove session."""
-    _sessions.pop(token, None)
-    _save_sessions()
 
 
 def check_credentials(username: str, password: str) -> bool:
@@ -96,7 +100,7 @@ def get_session_token(request: Request) -> str | None:
     return request.cookies.get("session_token")
 
 
-def require_auth(request: Request) -> bool:
+async def require_auth(request: Request) -> bool:
     """Check authorization. Used in dependencies."""
     token = get_session_token(request)
-    return verify_session(token)
+    return await verify_session(token)

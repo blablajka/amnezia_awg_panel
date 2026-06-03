@@ -173,10 +173,11 @@ if [ "$PHASE" -le 1 ]; then
         fi
     done
 
-    # Kill stale apt processes if still locked
-    fuser -k /var/lib/apt/lists/lock 2>/dev/null || true
-    fuser -k /var/lib/dpkg/lock-frontend 2>/dev/null || true
-    sleep 2
+    # Wait longer if still locked (don't kill — corrupts dpkg state)
+    if fuser /var/lib/apt/lists/lock /var/lib/dpkg/lock-frontend 2>/dev/null; then
+        echo "   Waiting for apt unlock (extra 30s)..."
+        sleep 30
+    fi
 
     apt-get update -qq || apt-get update -qq || apt-get update -qq
     apt-get install -y -qq linux-headers-amd64 2>/dev/null || \

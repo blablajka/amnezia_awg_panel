@@ -12,7 +12,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("", response_class=HTMLResponse)
 async def users_page(request: Request):
     token = get_session_token(request)
-    if not verify_session(token):
+    if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
     templates = request.app.state.templates
     async with async_session_factory() as session:

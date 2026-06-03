@@ -40,6 +40,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 class SubscriptionPlan(str, enum.Enum):
     """Доступные планы подписок."""
+    SEVEN_DAYS = "7_days"
     ONE_MONTH = "1_month"
     THREE_MONTHS = "3_months"
     TWELVE_MONTHS = "12_months"
@@ -176,6 +177,7 @@ class Server(Base):
     host: Mapped[str] = mapped_column(String(255), nullable=False)  # SSH host/IP
     port: Mapped[int] = mapped_column(Integer, default=22, nullable=False)  # SSH port
     awg_listen_port: Mapped[int] = mapped_column(Integer, default=39743, nullable=False)  # AWG UDP listen port
+    awg_subnet: Mapped[Optional[str]] = mapped_column(String(50), default="10.9.9.1/24", nullable=True)  # VPN tunnel subnet
     ssh_user: Mapped[str] = mapped_column(String(255), default="root", nullable=False)
     ssh_key_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     ssh_password: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)

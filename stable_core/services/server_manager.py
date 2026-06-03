@@ -116,9 +116,11 @@ class ServerManager:
 
     @staticmethod
     def _get_ssh_client(server: Server) -> paramiko.SSHClient:
-        """Создать и настроить SSH-клиент для сервера."""
+        """Create SSH client with host key verification."""
         ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # Load system known_hosts, reject unknown keys
+        ssh.load_system_host_keys()
+        ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
 
         connect_kwargs: dict = {
             "hostname": server.host,
@@ -173,7 +175,7 @@ class ServerManager:
     def _build_awg_server_conf(self, server: Server, awg_params: dict) -> str:
         """Build awg0.conf server config from AWG 2.0 params."""
         lines = ["[Interface]"]
-        lines.append("Address = 10.0.0.1/24")
+        lines.append("Address = %s" % (server.awg_subnet or "10.9.9.1/24"))
         lines.append("ListenPort = %s" % (server.awg_listen_port or 39743))
         # AWG 2.0 obfuscation params
         for key in ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4"):
@@ -301,8 +303,9 @@ class ServerManager:
                 ssh,
                 "mkdir -p /root/awg && echo '%s' > /root/awg/server_private.key" % server_key,
             )
-            # Build final config with key
-            final_conf = "PrivateKey = %s\n" % server_key + server_conf
+            # Build final config with PrivateKey INSIDE [Interface] section
+            insert_pos = server_conf.index("\n") + 1  # right after [Interface] line
+            final_conf = server_conf[:insert_pos] + "PrivateKey = %s\n" % server_key + server_conf[insert_pos:]
             self._sftp_put_text(ssh, "/etc/amnezia/amneziawg/awg0.conf", final_conf)
             logs.append("awg0.conf: uploaded")
 

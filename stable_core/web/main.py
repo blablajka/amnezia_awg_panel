@@ -149,9 +149,9 @@ def create_web_app() -> FastAPI:
                     pass
         logger.info("Shutdown complete.")
 
-    # ── Prometheus Metrics ────────────────────────────────────────
+    # ── Prometheus Metrics (root path, no auth — for Prometheus scraping) ─
 
-    @admin_router.get("/metrics")
+    @app.get("/metrics")
     async def prometheus_metrics(request: Request):
         """Prometheus-compatible metrics endpoint.
 
@@ -221,7 +221,7 @@ def create_web_app() -> FastAPI:
     @admin_router.get("/login", response_class=HTMLResponse)
     async def login_page(request: Request):
         token = get_session_token(request)
-        if verify_session(token):
+        if await verify_session(token):
             return RedirectResponse(f"{settings.ADMIN_PATH}/dashboard", status_code=302)
         return templates.TemplateResponse(request=request, name="login.html", context={
             "request": request, "error": None, "admin_path": settings.ADMIN_PATH
@@ -234,13 +234,13 @@ def create_web_app() -> FastAPI:
         password: str = Form(...),
     ):
         if check_credentials(username, password):
-            token = create_session(username)
+            token = await create_session(username)
             response = RedirectResponse(f"{settings.ADMIN_PATH}/dashboard", status_code=302)
             response.set_cookie(
                 "session_token", token,
                 httponly=True,
                 max_age=86400 * 7,  # 7 days
-                samesite="lax",
+                samesite="strict",
             )
             return response
 
@@ -254,7 +254,7 @@ def create_web_app() -> FastAPI:
     async def logout(request: Request):
         token = get_session_token(request)
         if token:
-            delete_session(token)
+            await delete_session(token)
         response = RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
         response.delete_cookie("session_token")
         return response

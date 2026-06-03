@@ -52,7 +52,7 @@ class AwgProtocolHandler(BaseProtocolHandler):
             create_resp = await http.post(
                 "%s/api/clients" % api_base,
                 headers=headers,
-                json={"id": client_id, "name": client_name},
+                json={"id": client_id},
             )
             create_resp.raise_for_status()
 
