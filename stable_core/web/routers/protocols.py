@@ -65,6 +65,6 @@ async def deploy_protocol(
 
         await handler.deploy_server(server, **kwargs)
     except Exception as e:
-        return RedirectResponse(f"/protocols?error={str(e)[:200]}", status_code=302)
+        return RedirectResponse(f"{settings.ADMIN_PATH}/protocols?error={str(e)[:200]}", status_code=302)
 
     return RedirectResponse(f"{settings.ADMIN_PATH}/protocols?deployed=1", status_code=302)

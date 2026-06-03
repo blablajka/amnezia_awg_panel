@@ -213,7 +213,7 @@ class Server(Base):
     @property
     def country_flag(self) -> str:
         """Эмодзи-флаг по коду страны."""
-        flags = {"DE": "🇩🇪", "NL": "🇳🇱", "LT": "🇱🇹"}
+        flags = {"DE": "🇩🇪", "NL": "🇳🇱", "LT": "🇱🇹", "RU": "🇷🇺"}
         return flags.get(self.country_code, "🌍")
 
     def __repr__(self) -> str:
@@ -262,9 +262,9 @@ class UserServer(Base):
     )
 
     # ── Relationships ────────────────────────────────────────────────
-    user: Mapped[User] = relationship(back_populates="user_servers")
-    server: Mapped[Server] = relationship(back_populates="user_servers")
-    subscription: Mapped[Subscription] = relationship(back_populates="user_servers")
+    user: Mapped[User] = relationship(back_populates="user_servers", lazy="selectin")
+    server: Mapped[Server] = relationship(back_populates="user_servers", lazy="selectin")
+    subscription: Mapped[Subscription] = relationship(back_populates="user_servers", lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<UserServer id={self.id} user={self.user_id} server={self.server_id}>"

@@ -9,7 +9,6 @@ FastAPI Web Application — админ-панель + YooKassa webhook.
 """
 from __future__ import annotations
 
-import json
 import logging
 import sys
 import asyncio
@@ -19,10 +18,15 @@ from pathlib import Path
 logger = logging.getLogger("panel")
 logger.setLevel(logging.INFO)
 
-from fastapi import FastAPI, Request, Form, Depends, APIRouter
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi import FastAPI, Request, Form, APIRouter
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
+# Обеспечить stable_core/ в sys.path (нужно при запуске python web/main.py)
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 from config import settings
 from database.session import async_session_factory
@@ -108,8 +112,8 @@ def create_web_app() -> FastAPI:
                                                 traffic_tx=UserServer.traffic_tx + tx)
                                     )
                             await session.commit()
-                        except Exception:
-                            pass  # Server offline or no stats
+                        except Exception as _e:
+                            logger.debug("Traffic sync failed for server %s: %s", getattr(server, 'name', '?'), _e)
             except Exception as e:
                 logger.error(f"Traffic billing error: {e}")
             await asyncio.sleep(300)  # Every 5 minutes
@@ -118,17 +122,32 @@ def create_web_app() -> FastAPI:
     async def startup_event():
         from database.session import init_db
         await init_db()
-        asyncio.create_task(cleanup_loop())
-        asyncio.create_task(traffic_billing_loop())
+        app.state._cleanup_task = asyncio.create_task(cleanup_loop())
+        app.state._traffic_task = asyncio.create_task(traffic_billing_loop())
 
         # Start Telegram bot in background (non-blocking)
         if settings.BOT_TOKEN and settings.BOT_TOKEN != "dummy_token_to_allow_startup":
             try:
                 from bot.handlers import start_bot
-                asyncio.create_task(start_bot())
+                app.state._bot_task = asyncio.create_task(start_bot())
                 logger.info("Telegram bot background task created")
             except Exception as e:
                 logger.warning("Telegram bot failed to start: %s", e)
+                app.state._bot_task = None
+
+    @app.on_event("shutdown")
+    async def shutdown_event():
+        """Clean up background tasks on server shutdown."""
+        logger.info("Shutting down background tasks...")
+        for attr in ("_cleanup_task", "_traffic_task", "_bot_task"):
+            task = getattr(app.state, attr, None)
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+        logger.info("Shutdown complete.")
 
     # ── Login / Logout ───────────────────────────────────────────────
 

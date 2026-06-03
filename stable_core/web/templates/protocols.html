@@ -50,7 +50,7 @@
                         <p class="text-xs text-dark-200 font-mono">{{ s.host }}:{{ s.port }}</p>
                     </div>
                 </div>
-                {% if st.online %}
+                {% if st.status == 'online' %}
                 <span class="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full">
                     <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>Online
                 </span>

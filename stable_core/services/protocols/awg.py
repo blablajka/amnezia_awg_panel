@@ -1,14 +1,13 @@
 """
-AwgProtocolHandler — AmneziaWG via awg-server REST API (primary) + SSH fallback.
+AwgProtocolHandler — AmneziaWG via awg-server REST API.
 
-CRUD operations use awg-server HTTP API (port 7777).
-SSH is reserved for: deploy, syncconf, PSK generation, emergency regen.
+All client CRUD operations use awg-server HTTP API (port 7777).
+SSH reserved for: deploy, syncconf.
 """
 from __future__ import annotations
 
 import logging
 import uuid
-import json
 
 import httpx
 
@@ -123,23 +122,21 @@ class AwgProtocolHandler(BaseProtocolHandler):
                 return {"status": "offline", "error": str(e)}
 
     async def get_client_traffic(self, server: Server, identifier: str) -> tuple[int, int]:
-        """Get per-client traffic via awg-server client list."""
+        """Get per-client traffic via awg-server stats endpoint."""
         api_base = self._get_api_url(server)
         headers = self._get_headers(server)
 
         async with httpx.AsyncClient(timeout=self._timeout) as http:
             try:
                 resp = await http.get(
-                    "%s/api/clients" % api_base, headers=headers,
+                    "%s/api/clients/%s/stats" % (api_base, identifier),
+                    headers=headers,
                 )
                 resp.raise_for_status()
-                clients = resp.json()
-                for c in clients if isinstance(clients, list) else []:
-                    if c.get("id") == identifier:
-                        rx = int(c.get("transferRx", 0) or c.get("transfer_rx", 0))
-                        tx = int(c.get("transferTx", 0) or c.get("transfer_tx", 0))
-                        return rx, tx
-                return 0, 0
+                data = resp.json()
+                rx = int(data.get("rx_bytes", 0))
+                tx = int(data.get("tx_bytes", 0))
+                return rx, tx
             except Exception:
                 return 0, 0
 
@@ -171,76 +168,52 @@ class AwgProtocolHandler(BaseProtocolHandler):
                 return []
 
     async def get_all_traffic(self, server: Server) -> list[dict]:
-        """Get traffic for all clients via awg-server API (preferred) or SSH fallback."""
+        """Get traffic for all clients via awg-server per-client stats."""
         api_base = self._get_api_url(server)
         headers = self._get_headers(server)
 
         async with httpx.AsyncClient(timeout=self._timeout) as http:
             try:
-                resp = await http.get(
+                # 1. Get client list
+                list_resp = await http.get(
                     "%s/api/clients" % api_base, headers=headers,
                 )
-                resp.raise_for_status()
-                clients = resp.json()
+                list_resp.raise_for_status()
+                clients = list_resp.json()
+                if not isinstance(clients, list):
+                    return []
+
+                # 2. Get stats for each client
                 result = []
-                for c in clients if isinstance(clients, list) else []:
-                    result.append({
-                        "name": c.get("id", c.get("name", "")),
-                        "rx": int(c.get("transferRx", 0) or c.get("transfer_rx", 0)),
-                        "tx": int(c.get("transferTx", 0) or c.get("transfer_tx", 0)),
-                    })
+                for c in clients:
+                    client_id = c.get("id", "")
+                    if not client_id:
+                        continue
+                    try:
+                        stats_resp = await http.get(
+                            "%s/api/clients/%s/stats" % (api_base, client_id),
+                            headers=headers,
+                        )
+                        stats_resp.raise_for_status()
+                        stats = stats_resp.json()
+                        result.append({
+                            "name": client_id,
+                            "rx": int(stats.get("rx_bytes", 0)),
+                            "tx": int(stats.get("tx_bytes", 0)),
+                        })
+                    except Exception:
+                        result.append({"name": client_id, "rx": 0, "tx": 0})
                 return result
             except Exception:
-                # Fallback to SSH + manage_amneziawg.sh
-                return await self._get_all_traffic_ssh(server)
-
-    async def _get_all_traffic_ssh(self, server: Server) -> list[dict]:
-        """SSH fallback for traffic stats."""
-        import asyncio as aio
-        loop = aio.get_event_loop()
-
-        def _sync() -> list[dict]:
-            ssh = self._sm._get_ssh_client(server)
-            try:
-                raw = self._sm._exec_command(
-                    ssh,
-                    "sudo bash /root/awg/manage_amneziawg.sh stats --json 2>/dev/null || echo '[]'",
-                )
-                return json.loads(raw) if raw.strip() else []
-            except Exception:
+                logger.debug("Traffic stats unavailable for %s via API", server.name)
                 return []
-            finally:
-                ssh.close()
-
-        return await loop.run_in_executor(None, _sync)
 
     # ═══════════════════════════════════════════════════════════════
-    # Admin operations (SSH-based — not available in awg-server API)
+    # Admin operations (SSH-based)
     # ═══════════════════════════════════════════════════════════════
-
-    async def create_client_with_psk(self, server: Server, client_name: str) -> str:
-        """Create client with PresharedKey (SSH — for Shadowrocket/iOS)."""
-        import asyncio as aio
-        loop = aio.get_event_loop()
-
-        def _sync() -> str:
-            ssh = self._sm._get_ssh_client(server)
-            try:
-                self._sm._exec_command(
-                    ssh,
-                    "sudo bash /root/awg/manage_amneziawg.sh add %s --psk" % client_name,
-                )
-                conf = self._sm._exec_command(
-                    ssh, "cat /root/awg/%s.conf" % client_name,
-                )
-                return conf
-            finally:
-                ssh.close()
-
-        return await loop.run_in_executor(None, _sync)
 
     async def syncconf(self, server: Server) -> str:
-        """Hot-reload AWG config (SSH)."""
+        """Hot-reload AWG config via SSH."""
         import asyncio as aio
         loop = aio.get_event_loop()
 
@@ -250,26 +223,6 @@ class AwgProtocolHandler(BaseProtocolHandler):
                 return self._sm._exec_command(
                     ssh,
                     "awg syncconf awg0 2>/dev/null || systemctl restart awg-quick@awg0",
-                )
-            finally:
-                ssh.close()
-
-        return await loop.run_in_executor(None, _sync)
-
-    async def regen_client(self, server: Server, client_name: str) -> str:
-        """Regenerate client config from live awg0.conf (SSH)."""
-        import asyncio as aio
-        loop = aio.get_event_loop()
-
-        def _sync() -> str:
-            ssh = self._sm._get_ssh_client(server)
-            try:
-                self._sm._exec_command(
-                    ssh,
-                    "sudo bash /root/awg/manage_amneziawg.sh regen %s" % client_name,
-                )
-                return self._sm._exec_command(
-                    ssh, "cat /root/awg/%s.conf" % client_name,
                 )
             finally:
                 ssh.close()

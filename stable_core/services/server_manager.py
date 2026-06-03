@@ -213,7 +213,9 @@ class ServerManager:
             "Environment=AWG_API_TOKEN=%s" % token,
             "Environment=AWG_ADDRESS=10.0.0.1/24",
             "Environment=AWG_ENDPOINT=%s" % server.host,
-            "Environment=AWG_PORT=%s" % listen_port,
+            "Environment=AWG_LISTEN_PORT=%s" % listen_port,
+            "Environment=AWG_HTTP_PORT=7777",
+            "Environment=AWG_DATA_DIR=/data",
         ]
         for key in ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4", "I1"):
             val = awg_params.get(key, "")
@@ -263,7 +265,7 @@ class ServerManager:
                     "apt-get update -qq && apt-get install -y -qq curl ipset iptables iproute2\n"
                     "if ! lsmod | grep -q amneziawg; then\n"
                     "  cd /tmp\n"
-                    "  curl -fsSL https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.14.1/install_amneziawg.sh -o install_awg.sh\n"
+                    "  curl -fsSL https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/install_amneziawg.sh -o install_awg.sh\n"
                     "  bash install_awg.sh --preset=%s --port=%s --yes --route-amnezia --no-tweaks\n"
                     "fi\n"
                 ) % (preset_val, listen_port)
