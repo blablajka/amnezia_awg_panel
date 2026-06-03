@@ -31,7 +31,7 @@ AWG_DIR="/root/awg"
 PHASE_FILE="$INSTALL_DIR/.install_phase"
 AWG_INSTALLER_PATH="$AWG_DIR/install_awg.sh"
 AWG_INSTALLER_ARGS="$AWG_DIR/.awg_installer_args"
-SELF_PATH="$INSTALL_DIR/install.sh"
+SELF_PATH="$AWG_DIR/smart-vpn-install.sh"
 RESUME_FLAG="${1:-}"
 
 # Cache server IP once
@@ -397,8 +397,10 @@ if [ "$PHASE" -le 5 ]; then
     if [ "$SKIP_ZAPRET" != "1" ]; then
         echo ""; echo "=> [6/8] Zapret (DPI bypass)..."
         if [ ! -d /opt/zapret ]; then
+            # Zapret needs these build deps
+            apt-get install -y -qq libnetfilter-queue-dev libnfnetlink-dev libmnl-dev libsystemd-dev 2>/dev/null || true
             git clone -q --depth=1 https://github.com/bol-van/zapret.git /tmp/zapret 2>/dev/null && {
-                cd /tmp/zapret; echo 5 | ./install_easy.sh 2>/dev/null || true; cd /
+                cd /tmp/zapret; echo 5 | ./install_easy.sh || true; cd /
                 rm -rf /tmp/zapret
             }
         fi
@@ -442,10 +444,11 @@ fi
 if [ "$PHASE" -le 8 ]; then
     echo ""; echo "=> [8/8] Web Panel..."
 
-    rm -rf "$INSTALL_DIR/stable_core"
-    git clone -q "$REPO_URL" "$INSTALL_DIR/stable_core" 2>/dev/null || {
-        # If clone fails (already exists), pull
-        cd "$INSTALL_DIR/stable_core" && git pull -q origin master 2>/dev/null || true
+    # Clone repo to INSTALL_DIR (repo contains stable_core/ inside)
+    rm -rf "$INSTALL_DIR"
+    git clone -q "$REPO_URL" "$INSTALL_DIR" 2>/dev/null || {
+        mkdir -p "$INSTALL_DIR"
+        git clone -q "$REPO_URL" "$INSTALL_DIR"
     }
     cd "$INSTALL_DIR/stable_core"
 
