@@ -14,7 +14,7 @@ SQLAlchemy 2.0 модели для Amnezia VPN System.
 from __future__ import annotations
 
 import enum
-from datetime import date, datetime, timezone
+from datetime import date as dt_date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -393,7 +393,7 @@ class DailyStat(Base):
     __tablename__ = "daily_stats"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    date: Mapped[date] = mapped_column(Date, unique=True, nullable=False, index=True)
+    date: Mapped[dt_date] = mapped_column(Date, unique=True, nullable=False, index=True)
     new_users: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     new_subscriptions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     revenue: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)

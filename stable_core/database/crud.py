@@ -174,7 +174,7 @@ async def count_active_subscriptions(session: AsyncSession) -> int:
 # ═══════════════════════════════════════════════════════════════════
 
 async def get_active_servers(session: AsyncSession) -> list[Server]:
-    stmt = select(Server).where(Server.is_active == True).order_by(Server.id)  # noqa: E712
+    stmt = select(Server).where(Server.is_active).order_by(Server.id)
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
@@ -225,7 +225,7 @@ async def create_user_server(
 async def get_user_configs(
     session: AsyncSession, user_id: int, subscription_id: int | None = None,
 ) -> list[UserServer]:
-    conditions = [UserServer.user_id == user_id, UserServer.is_active == True]  # noqa: E712
+    conditions = [UserServer.user_id == user_id, UserServer.is_active]
     if subscription_id:
         conditions.append(UserServer.subscription_id == subscription_id)
     stmt = select(UserServer).where(and_(*conditions))
@@ -413,7 +413,7 @@ async def get_bridge_by_id(session: AsyncSession, bridge_id: int) -> Bridge | No
 
 
 async def get_active_bridges(session: AsyncSession) -> list[Bridge]:
-    stmt = select(Bridge).where(Bridge.is_active == True).order_by(Bridge.id)  # noqa: E712
+    stmt = select(Bridge).where(Bridge.is_active).order_by(Bridge.id)
     result = await session.execute(stmt)
     return list(result.scalars().all())
 

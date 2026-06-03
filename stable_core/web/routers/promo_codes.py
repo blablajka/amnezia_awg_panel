@@ -1,6 +1,5 @@
 """Promo Codes Router — управление промокодами."""
 from __future__ import annotations
-from decimal import Decimal
 from fastapi import APIRouter, Request, Form
 from config import settings
 from fastapi.responses import HTMLResponse, RedirectResponse

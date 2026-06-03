@@ -1,11 +1,11 @@
 """
-FastAPI Web Application — админ-панель + YooKassa webhook.
+FastAPI Web Application — админ-панель Smart VPN.
 
 Включает:
   - Jinja2 шаблоны с Tailwind CSS
   - Аутентификация (login/logout)
-  - Dashboard с метриками
-  - YooKassa webhook endpoint
+  - Dashboard с метриками и статусом серверов
+  - Prometheus /metrics endpoint
 """
 from __future__ import annotations
 
@@ -193,7 +193,7 @@ def create_web_app() -> FastAPI:
 
             # vpn_active_servers
             active_servers = await session.scalar(
-                select(sqlfunc.count(ServerModel.id)).where(ServerModel.is_active == True)
+                select(sqlfunc.count(ServerModel.id)).where(ServerModel.is_active)
             )
             metrics_lines.append("# HELP vpn_active_servers Active VPN servers")
             metrics_lines.append("# TYPE vpn_active_servers gauge")

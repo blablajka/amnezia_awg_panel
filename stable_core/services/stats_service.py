@@ -116,7 +116,7 @@ class StatsService:
         from sqlalchemy import select as sel
 
         result = await session.execute(
-            sel(ServerModel).where(ServerModel.is_active == True)
+            sel(ServerModel).where(ServerModel.is_active)
         )
         servers = result.scalars().all()
 
