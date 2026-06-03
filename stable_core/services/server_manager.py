@@ -213,7 +213,7 @@ class ServerManager:
             "Restart=always",
             "RestartSec=5",
             "Environment=AWG_API_TOKEN=%s" % token,
-            "Environment=AWG_ADDRESS=10.0.0.1/24",
+            "Environment=AWG_ADDRESS=%s" % (server.awg_subnet or "10.9.9.1/24"),
             "Environment=AWG_ENDPOINT=%s" % server.host,
             "Environment=AWG_LISTEN_PORT=%s" % listen_port,
             "Environment=AWG_HTTP_PORT=7777",
