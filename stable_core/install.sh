@@ -92,13 +92,35 @@ if [ "$PHASE" -le 1 ]; then
 
     echo ""
     echo "=> [1/8] System dependencies..."
-    apt-get update -qq
+
+    # Wait for apt lock (bivlked or unattended-upgrades may hold it)
+    for i in $(seq 1 30); do
+        if fuser /var/lib/apt/lists/lock /var/lib/dpkg/lock-frontend 2>/dev/null; then
+            echo "   Waiting for apt lock (attempt $i/30)..."
+            sleep 5
+        else
+            break
+        fi
+    done
+
+    # Kill stale apt processes if still locked
+    fuser -k /var/lib/apt/lists/lock 2>/dev/null || true
+    fuser -k /var/lib/dpkg/lock-frontend 2>/dev/null || true
+    sleep 2
+
+    apt-get update -qq || apt-get update -qq || apt-get update -qq
     apt-get install -y -qq linux-headers-amd64 2>/dev/null || \
         apt-get install -y -qq linux-headers-"$(uname -r)" 2>/dev/null || true
     apt-get install -y -qq \
         git python3 python3-venv python3-pip nginx curl wget jq \
         uuid-runtime ipset iptables iproute2 qrencode \
-        build-essential dkms gnupg gawk perl
+        build-essential dkms gnupg gawk perl || {
+            apt-get install -y -qq --fix-broken
+            apt-get install -y -qq \
+                git python3 python3-venv python3-pip nginx curl wget jq \
+                uuid-runtime ipset iptables iproute2 qrencode \
+                build-essential dkms gnupg gawk perl
+        }
     mkdir -p /usr/share/keyrings
     echo "   System packages: OK"
 
