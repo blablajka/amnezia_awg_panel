@@ -53,6 +53,9 @@ async def _migrate_sqlite(conn) -> None:
             "api_url": ("VARCHAR(512)", "NULL"),
             "api_token": ("VARCHAR(512)", "NULL"),
             "deploy_log": ("TEXT", "''"),
+            "outbound_config": ("TEXT", "NULL"),
+            "outbound_endpoint": ("VARCHAR(255)", "NULL"),
+            "wg_config_path": ("VARCHAR(512)", "'/etc/amnezia/amneziawg/awg0.conf'"),
         },
         "user_servers": {
             "traffic_rx": ("BIGINT", "0"),
