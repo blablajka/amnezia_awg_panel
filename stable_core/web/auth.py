@@ -1,44 +1,90 @@
 """
-Web Authentication — простая сессионная аутентификация для админ-панели.
+Web Authentication — file-backed session auth for admin panel.
+Sessions survive server restarts via JSON file in /data/sessions.json.
 """
 from __future__ import annotations
 
-import hashlib
+import json
 import secrets
-from functools import wraps
+import time
+from pathlib import Path
 from typing import Any
 
-from fastapi import Request, HTTPException
+from fastapi import Request
 from fastapi.responses import RedirectResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from config import settings
 
-# Простое хранилище сессий (в продакшне — Redis)
+# File-backed session store (survives restarts)
+SESSIONS_FILE = Path("/data/sessions.json")
 _sessions: dict[str, dict[str, Any]] = {}
+
+# Max session age: 7 days
+SESSION_MAX_AGE = 86400 * 7
+
+
+def _load_sessions() -> None:
+    """Load sessions from disk on startup."""
+    global _sessions
+    try:
+        if SESSIONS_FILE.exists():
+            raw = json.loads(SESSIONS_FILE.read_text())
+            now = time.time()
+            # Drop expired sessions
+            _sessions = {
+                k: v for k, v in raw.items()
+                if v.get("_created", 0) + SESSION_MAX_AGE > now
+            }
+    except Exception:
+        _sessions = {}
+
+
+def _save_sessions() -> None:
+    """Persist sessions to disk atomically."""
+    try:
+        SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = SESSIONS_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(_sessions))
+        tmp.rename(SESSIONS_FILE)
+    except Exception:
+        pass  # Non-critical — sessions survive in memory
+
+
+# Load on import
+_load_sessions()
 
 
 def create_session(username: str) -> str:
-    """Создать новую сессию и вернуть token."""
+    """Create new session, return token."""
     token = secrets.token_urlsafe(32)
-    _sessions[token] = {"username": username}
+    _sessions[token] = {"username": username, "_created": time.time()}
+    _save_sessions()
     return token
 
 
 def verify_session(token: str | None) -> bool:
-    """Проверить, валидна ли сессия."""
+    """Check if session is valid."""
     if not token:
         return False
-    return token in _sessions
+    session = _sessions.get(token)
+    if not session:
+        return False
+    # Check expiry
+    if session.get("_created", 0) + SESSION_MAX_AGE < time.time():
+        _sessions.pop(token, None)
+        _save_sessions()
+        return False
+    return True
 
 
 def delete_session(token: str) -> None:
-    """Удалить сессию."""
+    """Remove session."""
     _sessions.pop(token, None)
+    _save_sessions()
 
 
 def check_credentials(username: str, password: str) -> bool:
-    """Проверить логин/пароль."""
+    """Verify login/password against settings."""
     return (
         username == settings.ADMIN_USERNAME
         and password == settings.ADMIN_PASSWORD
@@ -46,11 +92,11 @@ def check_credentials(username: str, password: str) -> bool:
 
 
 def get_session_token(request: Request) -> str | None:
-    """Извлечь токен сессии из cookies."""
+    """Extract session token from cookies."""
     return request.cookies.get("session_token")
 
 
 def require_auth(request: Request) -> bool:
-    """Проверить авторизацию. Используется в dependencies."""
+    """Check authorization. Used in dependencies."""
     token = get_session_token(request)
     return verify_session(token)

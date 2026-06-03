@@ -239,7 +239,8 @@ def create_web_app() -> FastAPI:
             response.set_cookie(
                 "session_token", token,
                 httponly=True,
-                max_age=86400 * 7,  # 7 дней
+                max_age=86400 * 7,  # 7 days
+                samesite="lax",
             )
             return response
 
