@@ -43,7 +43,7 @@ async def add_server(
     port: int = Form(22),
     ssh_user: str = Form("root"),
     ssh_password: str = Form(""),
-    country_code: str = Form("DK"),
+    country_code: str = Form("EU"),
     preset: str = Form("default"),
     awg_listen_port: int = Form(39743),
     ipv6_enabled: bool = Form(True),
@@ -61,19 +61,32 @@ async def add_server(
             awg_listen_port=awg_listen_port,
             ipv6_enabled=ipv6_enabled,
         )
+        deploy_log = ""
+        rebooted = False
         try:
-            await sm.deploy_awg_server(server, preset=preset)
-            logger.info("Server %s auto-installed OK", name)
+            deploy_log = await sm.deploy_awg_server(server, preset=preset)
+            server.deploy_log = deploy_log
+            server.api_url = server.api_url or "http://127.0.0.1:7777"
+            if "reboot" in deploy_log.lower() or "restart" in deploy_log.lower():
+                rebooted = True
+            logger.info("Server %s deployed OK, %d chars of logs", name, len(deploy_log))
         except Exception as e:
             logger.error("Auto-install failed for %s: %s", name, e)
-            await session.rollback()
+            server.deploy_log = "DEPLOY ERROR: %s\n\nPartial logs:\n%s" % (str(e), deploy_log)
+            await session.commit()
             return RedirectResponse(
                 f"{settings.ADMIN_PATH}/servers?error={str(e)[:100]}",
                 status_code=302,
             )
         await session.commit()
+
+    if rebooted:
+        return RedirectResponse(
+            f"{settings.ADMIN_PATH}/servers?added=1&rebooted=1&server_id={server.id}",
+            status_code=302,
+        )
     return RedirectResponse(
-        f"{settings.ADMIN_PATH}/servers?added=1",
+        f"{settings.ADMIN_PATH}/servers?added=1&server_id={server.id}",
         status_code=302,
     )
 

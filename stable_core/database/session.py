@@ -52,6 +52,7 @@ async def _migrate_sqlite(conn) -> None:
             "protocol": ("VARCHAR(50)", "'awg'"),
             "api_url": ("VARCHAR(512)", "NULL"),
             "api_token": ("VARCHAR(512)", "NULL"),
+            "deploy_log": ("TEXT", "''"),
         },
         "user_servers": {
             "traffic_rx": ("BIGINT", "0"),

@@ -201,6 +201,7 @@ class Server(Base):
     awg_preset: Mapped[Optional[str]] = mapped_column(String(50), default="default", nullable=True)
     ipv6_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)  # IPv6 dual-stack (always on)
     ipv6_subnet: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # e.g. fddd:2c4:2c4:2c4::/64
+    deploy_log: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Deploy output log
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -215,7 +216,7 @@ class Server(Base):
     @property
     def country_flag(self) -> str:
         """Эмодзи-флаг по коду страны."""
-        flags = {"DE": "🇩🇪", "NL": "🇳🇱", "LT": "🇱🇹", "RU": "🇷🇺"}
+        flags = {"DE": "🇩🇪", "NL": "🇳🇱", "LT": "🇱🇹", "RU": "🇷🇺", "EU": "🇪🇺", "DK": "🇩🇰"}
         return flags.get(self.country_code, "🌍")
 
     def __repr__(self) -> str:
