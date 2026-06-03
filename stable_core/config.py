@@ -48,8 +48,9 @@ class Settings(BaseSettings):
 
     @property
     def prices(self) -> dict[str, int]:
-        """Словарь цен по планам."""
+        """Plan prices in RUB."""
         return {
+            "7_days": 0,
             "1_month": self.PRICE_1_MONTH,
             "3_months": self.PRICE_3_MONTHS,
             "12_months": self.PRICE_12_MONTHS,

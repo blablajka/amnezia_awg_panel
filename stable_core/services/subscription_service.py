@@ -67,10 +67,10 @@ class SubscriptionService:
                 user_id, plan, expires_at,
             )
 
-        # Обновляем ссылку на subscription в платеже
+        # Link payment to subscription
         if payment_id:
             await crud.update_payment_status(
-                session, "", "succeeded", subscription_id=sub.id,
+                session, payment_id, "succeeded", subscription_id=sub.id,
             )
 
         return sub
