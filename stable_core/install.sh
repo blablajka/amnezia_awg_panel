@@ -77,10 +77,77 @@ fi
 
 trap 'echo "ERROR at line $LINENO: $BASH_COMMAND" >&2' ERR
 
+# ── Detect installed state ──────────────────────────────────────────
+
+_is_awg_installed() { command -v awg >/dev/null 2>&1 && ip link show awg0 >/dev/null 2>&1; }
+_is_panel_installed() { systemctl is-active smart-vpn >/dev/null 2>&1; }
+_is_awg_server_installed() { systemctl is-active awg-server >/dev/null 2>&1; }
+
 echo "================================================="
-echo " Smart VPN Panel — Installer v2.2"
+echo " Smart VPN Panel — Installer v2.3"
 echo " Phase: $PHASE | $(lsb_release -ds 2>/dev/null || echo 'Debian/Ubuntu')"
 echo "================================================="
+
+# ── Already installed? Show mini dashboard ──────────────────────────
+
+if _is_awg_installed && _is_panel_installed && _is_awg_server_installed && [ "$PHASE" = "0" ]; then
+    IP=$(_get_ip)
+    ADMIN_PATH_VAL=$(grep -oP 'ADMIN_PATH=\K.+' "$INSTALL_DIR/stable_core/.env" 2>/dev/null || echo "/admin")
+    ADMIN_USER_VAL=$(grep -oP 'ADMIN_USERNAME=\K.+' "$INSTALL_DIR/stable_core/.env" 2>/dev/null || echo "admin")
+    AWG_TOKEN_VAL=$(grep -oP 'AWG_API_TOKEN=\K.+' /etc/systemd/system/awg-server.service 2>/dev/null || echo "unknown")
+    PEERS=$(awg show 2>/dev/null | grep -c "peer:" || echo "0")
+
+    echo ""
+    echo "  ╔══════════════════════════════════════════════╗"
+    echo "  ║     Smart VPN Panel — Already Installed      ║"
+    echo "  ╠══════════════════════════════════════════════╣"
+    echo "  ║  Panel:  http://${IP}${ADMIN_PATH_VAL}/dashboard"
+    echo "  ║  Login:  $ADMIN_USER_VAL"
+    echo "  ║  Peers:  $PEERS"
+    echo "  ║  API:    http://127.0.0.1:7777"
+    echo "  ╠══════════════════════════════════════════════╣"
+    echo "  ║  Services:                                   ║"
+    echo "  ║    awg-quick@awg0  $(systemctl is-active awg-quick@awg0 2>/dev/null || echo '-')"
+    echo "  ║    awg-server      $(systemctl is-active awg-server 2>/dev/null || echo '-')"
+    echo "  ║    smart-vpn       $(systemctl is-active smart-vpn 2>/dev/null || echo '-')"
+    echo "  ║    node_exporter   $(systemctl is-active node_exporter 2>/dev/null || echo '-')"
+    echo "  ╚══════════════════════════════════════════════╝"
+    echo ""
+    echo "  Choose action:"
+    echo "    [1] Show credentials again"
+    echo "    [2] Reinstall everything (preserves clients)"
+    echo "    [3] Reinstall everything (FULL WIPE)"
+    echo "    [q] Quit"
+    echo ""
+    read -p "  Choice [1]: " CHOICE
+    CHOICE="${CHOICE:-1}"
+
+    case "$CHOICE" in
+        1)
+            cat "$INSTALL_DIR/CREDENTIALS.txt" 2>/dev/null || echo "No credentials file found"
+            echo "  Panel: http://${IP}${ADMIN_PATH_VAL}/dashboard"
+            echo "  Login: $ADMIN_USER_VAL"
+            exit 0
+            ;;
+        2)
+            echo "  Reinstalling (preserving /root/awg and /data)..."
+            rm -rf "$INSTALL_DIR/stable_core/venv"
+            ;;
+        3)
+            echo "  FULL WIPE..."
+            systemctl stop smart-vpn awg-server 2>/dev/null || true
+            rm -rf "$INSTALL_DIR" /data/clients.json /data/usage.json
+            rm -f "$AWG_DIR/setup_state"
+            echo "  Cleaned. Re-run installer."
+            exit 0
+            ;;
+        *)
+            exit 0
+            ;;
+    esac
+fi
+
+echo ""
 
 # ═══════════════════════════════════════════════════════════════════════
 # Phase 0-1: System Deps + bivlked AWG 2.0 Installer
@@ -126,7 +193,7 @@ if [ "$PHASE" -le 1 ]; then
 
     # ── Step 2: AmneziaWG 2.0 via bivlked installer ──────────────────
 
-    if [ "$SKIP_AWG_INSTALLER" != "1" ] && ! lsmod | grep -q amneziawg; then
+    if [ "$SKIP_AWG_INSTALLER" != "1" ] && ! _is_awg_installed; then
         echo ""
         echo "=> [2/8] AmneziaWG 2.0 via bivlked installer..."
         echo "   (Server will reboot 2 times — automatic resume after each)"
@@ -177,8 +244,8 @@ SVCEOF
             --preset="$AWG_PRESET" --route-amnezia --no-tweaks $AWG_EXTRA_ARGS 2>&1 | tail -10 || true
 
         # Check if bivlked actually needs reboot vs. already done
-        if lsmod | grep -q amneziawg && [ -f "$AWG_DIR/server_private.key" ]; then
-            echo "   AWG 2.0 installed (no reboot needed, or already done)"
+        if _is_awg_installed && [ -f "$AWG_DIR/server_private.key" ]; then
+            echo "   AWG 2.0 installed and running."
             systemctl disable smart-vpn-awg.service 2>/dev/null || true
         elif [ -f "$AWG_DIR/setup_state" ]; then
             # bivlked needs reboot to continue — let systemd resume it
@@ -188,7 +255,7 @@ SVCEOF
             reboot
             exit 0
         else
-            echo "   ERROR: bivlked installer failed (no state file, no AWG module)"
+            echo "   ERROR: bivlked installer failed (no state file, no AWG interface)"
             echo "   Check $AWG_DIR/install_amneziawg.log"
             exit 1
         fi
