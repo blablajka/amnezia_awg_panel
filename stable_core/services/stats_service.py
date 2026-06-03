@@ -110,8 +110,33 @@ class StatsService:
         )
 
     @staticmethod
+    async def get_active_servers_metrics(session: AsyncSession) -> list:
+        """Get active servers with aggregated traffic for dashboard cards."""
+        from database.models import Server as ServerModel, UserServer
+        from sqlalchemy import select as sel
+
+        result = await session.execute(
+            sel(ServerModel).where(ServerModel.is_active == True)
+        )
+        servers = result.scalars().all()
+
+        for s in servers:
+            traffic_result = await session.execute(
+                sel(
+                    func.coalesce(func.sum(UserServer.traffic_rx), 0),
+                    func.coalesce(func.sum(UserServer.traffic_tx), 0),
+                ).where(UserServer.server_id == s.id)
+            )
+            total_rx, total_tx = traffic_result.one()
+            s._total_rx = int(total_rx)
+            s._total_tx = int(total_tx)
+            s._total_traffic_gb = round((int(total_rx) + int(total_tx)) / (1024**3), 2)
+
+        return list(servers)
+
+    @staticmethod
     async def get_daily_stats(
         session: AsyncSession, days: int = 30,
     ) -> list[DailyStat]:
-        """Получить агрегированную статистику за последние N дней."""
+        """Get aggregated statistics for last N days."""
         return await crud.get_daily_stats(session, days=days)

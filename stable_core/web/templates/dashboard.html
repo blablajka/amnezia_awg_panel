@@ -59,6 +59,55 @@
         </div>
     </div>
 
+    <!-- Server Status Cards -->
+    {% if server_statuses %}
+    <div class="glass rounded-2xl p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">
+            <i class="fas fa-server text-brand-400 mr-2"></i>
+            Статус серверов
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {% for entry in server_statuses %}
+            {% set s = entry.server %}
+            {% set st = entry.status %}
+            <div class="bg-dark-600/50 rounded-xl p-4 border {% if st.status == 'online' %}border-emerald-500/30{% else %}border-red-500/30{% endif %}">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl">{{ s.country_flag }}</span>
+                        <div>
+                            <h3 class="text-white font-medium text-sm">{{ s.name }}</h3>
+                            <p class="text-xs text-dark-200 font-mono">{{ s.host }}</p>
+                        </div>
+                    </div>
+                    <span class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full whitespace-nowrap {% if st.status == 'online' %}text-emerald-400 bg-emerald-500/10{% else %}text-red-400 bg-red-500/10{% endif %}">
+                        <span class="w-1.5 h-1.5 rounded-full {% if st.status == 'online' %}bg-emerald-400 animate-pulse{% else %}bg-red-400{% endif %}"></span>
+                        {{ st.status }}
+                    </span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="bg-dark-700/50 rounded-lg p-2 text-center">
+                        <span class="text-dark-200">Peers</span>
+                        <p class="text-white font-bold text-sm">{{ st.get('peers', 0) }}</p>
+                    </div>
+                    <div class="bg-dark-700/50 rounded-lg p-2 text-center">
+                        <span class="text-dark-200">Preset</span>
+                        <p class="text-white font-bold text-sm">{{ s.awg_preset or 'default' }}</p>
+                    </div>
+                    <div class="bg-dark-700/50 rounded-lg p-2 text-center">
+                        <span class="text-dark-200">Traffic</span>
+                        <p class="text-white font-bold text-sm">{{ s._total_traffic_gb }} GB</p>
+                    </div>
+                    <div class="bg-dark-700/50 rounded-lg p-2 text-center">
+                        <span class="text-dark-200">Port</span>
+                        <p class="text-white font-bold text-sm">{{ s.awg_listen_port }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Revenue Chart -->
     <div class="glass rounded-2xl p-6">
         <h2 class="text-lg font-semibold text-white mb-4">

@@ -149,6 +149,73 @@ def create_web_app() -> FastAPI:
                     pass
         logger.info("Shutdown complete.")
 
+    # ── Prometheus Metrics ────────────────────────────────────────
+
+    @admin_router.get("/metrics")
+    async def prometheus_metrics(request: Request):
+        """Prometheus-compatible metrics endpoint.
+
+        Exposes business metrics for scraping by Prometheus.
+        System metrics via node_exporter on port 9100.
+        """
+        from database import crud
+        from database.models import User, Subscription, Server as ServerModel, Payment
+        from sqlalchemy import select, func as sqlfunc
+        from datetime import datetime, timezone
+
+        metrics_lines = []
+
+        async with async_session_factory() as session:
+            now = datetime.now(timezone.utc)
+
+            # vpn_users_total
+            total_users = await session.scalar(select(sqlfunc.count(User.id)))
+            metrics_lines.append("# HELP vpn_users_total Total registered VPN users")
+            metrics_lines.append("# TYPE vpn_users_total gauge")
+            metrics_lines.append("vpn_users_total %d" % (total_users or 0))
+
+            # vpn_active_subscriptions
+            active_subs = await session.scalar(
+                select(sqlfunc.count(Subscription.id)).where(
+                    Subscription.status == "active",
+                    Subscription.expires_at > now,
+                )
+            )
+            metrics_lines.append("# HELP vpn_active_subscriptions Active VPN subscriptions")
+            metrics_lines.append("# TYPE vpn_active_subscriptions gauge")
+            metrics_lines.append("vpn_active_subscriptions %d" % (active_subs or 0))
+
+            # vpn_servers_total
+            total_servers = await session.scalar(select(sqlfunc.count(ServerModel.id)))
+            metrics_lines.append("# HELP vpn_servers_total Total VPN servers")
+            metrics_lines.append("# TYPE vpn_servers_total gauge")
+            metrics_lines.append("vpn_servers_total %d" % (total_servers or 0))
+
+            # vpn_active_servers
+            active_servers = await session.scalar(
+                select(sqlfunc.count(ServerModel.id)).where(ServerModel.is_active == True)
+            )
+            metrics_lines.append("# HELP vpn_active_servers Active VPN servers")
+            metrics_lines.append("# TYPE vpn_active_servers gauge")
+            metrics_lines.append("vpn_active_servers %d" % (active_servers or 0))
+
+            # vpn_total_traffic_rx_bytes
+            from sqlalchemy import select as sel
+            total_rx = await session.scalar(
+                sel(sqlfunc.sum(Payment.amount)).where(Payment.status == "succeeded")
+            )
+            metrics_lines.append("# HELP vpn_revenue_total Total revenue in RUB")
+            metrics_lines.append("# TYPE vpn_revenue_total gauge")
+            metrics_lines.append("vpn_revenue_total %.2f" % (float(total_rx or 0)))
+
+        metrics_lines.append("# HELP vpn_panel_info VPN panel version info")
+        metrics_lines.append("# TYPE vpn_panel_info gauge")
+        metrics_lines.append('vpn_panel_info{version="2.0",protocol="awg2"} 1')
+
+        metrics_lines.append("")
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse("\n".join(metrics_lines), media_type="text/plain; charset=utf-8")
+
     # ── Login / Logout ───────────────────────────────────────────────
 
     @admin_router.get("/login", response_class=HTMLResponse)

@@ -228,15 +228,17 @@ class ServerManager:
         return "\n".join(lines) + "\n"
 
     def _deploy_awg_server_sync(self, server: Server, kwargs: dict) -> str:
-        """Deploy AmneziaWG 2.0 + awg-server on a pristine Debian/Ubuntu VPS.
+        """Deploy AmneziaWG 2.0 + awg-server + security on pristine Debian/Ubuntu VPS.
 
         Steps:
-        1. bivlked installer (non-interactive, kernel module + tools)
-        2. Enable IP forwarding (v4 + optional v6)
-        3. Generate awg0.conf in Python, upload via SFTP
+        1. bivlked installer (kernel module + AWG 2.0 tools)
+        2. IP forwarding (v4 + optional v6)
+        3. awg0.conf generation + upload
         4. Hot-reload AWG config
-        5. Install awg-server binary + systemd unit
-        6. Start and verify
+        5. awg-server binary + systemd
+        6. AS Network List (block scanners via ipset)
+        7. Zapret (DPI bypass)
+        8. node_exporter (Prometheus system metrics)
         """
         ssh = self._get_ssh_client(server)
         token = server.api_token
@@ -259,7 +261,7 @@ class ServerManager:
         try:
             # ── Step 1: bivlked installer ──────────────────────────
             if not kwargs.get("skip_installer"):
-                logger.info("[%s] Step 1/6: Installing AWG 2.0 via bivlked installer", server.name)
+                logger.info("[%s] Step 1/8: Installing AWG 2.0 via installer", server.name)
                 installer_cmd = (
                     "set -e; export DEBIAN_FRONTEND=noninteractive\n"
                     "apt-get update -qq && apt-get install -y -qq curl ipset iptables iproute2\n"
@@ -273,7 +275,7 @@ class ServerManager:
                 logs.append("installer: ok")
 
             # ── Step 2: IP forwarding ──────────────────────────────
-            logger.info("[%s] Step 2/6: Enabling IP forwarding", server.name)
+            logger.info("[%s] Step 2/8: Enabling IP forwarding", server.name)
             fwd_script = (
                 "sysctl -w net.ipv4.ip_forward=1\n"
                 "echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-ipforward.conf\n"
@@ -287,7 +289,7 @@ class ServerManager:
             logs.append("ip_forward: ok")
 
             # ── Step 3: Generate and upload awg0.conf ──────────────
-            logger.info("[%s] Step 3/6: Uploading awg0.conf", server.name)
+            logger.info("[%s] Step 3/8: Uploading awg0.conf", server.name)
             server_conf = self._build_awg_server_conf(server, awg_params)
             # Fetch or generate server private key
             key_cmd = "cat /root/awg/server_private.key 2>/dev/null || awg genkey"
@@ -305,7 +307,7 @@ class ServerManager:
             logs.append("awg0.conf: uploaded")
 
             # ── Step 4: Hot-reload AWG ─────────────────────────────
-            logger.info("[%s] Step 4/6: Hot-reloading AWG config", server.name)
+            logger.info("[%s] Step 4/8: Hot-reloading AWG config", server.name)
             out = self._exec_command(
                 ssh,
                 "awg syncconf awg0 2>/dev/null || systemctl restart awg-quick@awg0",
@@ -313,7 +315,7 @@ class ServerManager:
             logs.append("syncconf: %s" % (out[:80] if out else "ok"))
 
             # ── Step 5: Install awg-server binary ──────────────────
-            logger.info("[%s] Step 5/6: Installing awg-server binary", server.name)
+            logger.info("[%s] Step 5/8: Installing awg-server binary", server.name)
             arch_detect = 'uname -m | sed "s/x86_64/amd64/" | sed "s/aarch64/arm64/"'
             awg_server_url = (
                 "https://github.com/stealthsurf-vpn/awg-server/releases/latest/download/"
@@ -327,7 +329,7 @@ class ServerManager:
             logs.append("awg-server: %s" % out.strip())
 
             # ── Step 6: Systemd unit + start ───────────────────────
-            logger.info("[%s] Step 6/6: Starting awg-server service", server.name)
+            logger.info("[%s] Step 6/8: Starting awg-server service", server.name)
             unit_content = self._build_awg_server_systemd(server, awg_params, token)
             self._sftp_put_text(ssh, "/etc/systemd/system/awg-server.service", unit_content)
             out = self._exec_command(ssh, (
@@ -337,6 +339,62 @@ class ServerManager:
                 "systemctl is-active awg-server && echo 'ACTIVE' || echo 'FAILED'"
             ))
             logs.append("service: %s" % out.strip())
+
+            # ── Step 7: AS Network List (block scanners) ─────────
+            logger.info("[%s] Step 7/8: Installing AS Network List", server.name)
+            try:
+                self._exec_command(ssh, (
+                    "wget -qO- https://raw.githubusercontent.com/blablajka/AS_Network_List_for-debian/main/install.sh | bash"
+                ))
+                logs.append("as_list: ok")
+            except Exception as _e:
+                logger.warning("[%s] AS list install optional: %s", server.name, _e)
+                logs.append("as_list: skipped (%s)" % str(_e)[:50])
+
+            # ── Step 8: Zapret (DPI bypass) ─────────────────────
+            logger.info("[%s] Step 8/8: Installing Zapret", server.name)
+            try:
+                self._exec_command(ssh, (
+                    "set -e\n"
+                    "if [ ! -d /opt/zapret ]; then\n"
+                    "  cd /tmp\n"
+                    "  git clone --depth=1 https://github.com/bol-van/zapret.git\n"
+                    "  cd zapret\n"
+                    "  echo 5 | ./install_easy.sh\n"
+                    "fi\n"
+                    "echo 'zapret_ok'"
+                ))
+                logs.append("zapret: ok")
+            except Exception as _e:
+                logger.warning("[%s] Zapret install optional: %s", server.name, _e)
+                logs.append("zapret: skipped (%s)" % str(_e)[:50])
+
+            # ── Step 9: node_exporter (Prometheus metrics) ───────
+            logger.info("[%s] Installing node_exporter", server.name)
+            try:
+                self._exec_command(ssh, (
+                    "set -e\n"
+                    "if ! command -v node_exporter >/dev/null 2>&1; then\n"
+                    "  NODE_VERSION=1.8.2\n"
+                    "  ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')\n"
+                    "  cd /tmp\n"
+                    "  curl -fsSL \"https://github.com/prometheus/node_exporter/releases/download/v${NODE_VERSION}/node_exporter-${NODE_VERSION}.linux-${ARCH}.tar.gz\" -o node_exporter.tgz\n"
+                    "  tar xzf node_exporter.tgz\n"
+                    "  mv node_exporter-*.linux-*/node_exporter /usr/local/bin/\n"
+                    "  rm -rf node_exporter*\n"
+                    "  cat > /etc/systemd/system/node_exporter.service << 'UNIT'\n"
+                    "[Unit]\nDescription=Prometheus Node Exporter\nAfter=network.target\n\n"
+                    "[Service]\nType=simple\nExecStart=/usr/local/bin/node_exporter --collector.systemd\nRestart=always\n\n"
+                    "[Install]\nWantedBy=multi-user.target\nUNIT\n"
+                    "  systemctl daemon-reload\n"
+                    "  systemctl enable --now node_exporter\n"
+                    "fi\n"
+                    "echo 'node_exporter_ok'"
+                ))
+                logs.append("node_exporter: ok")
+            except Exception as _e:
+                logger.warning("[%s] node_exporter optional: %s", server.name, _e)
+                logs.append("node_exporter: skipped")
 
             # Save API URL for future use
             if not server.api_url:
