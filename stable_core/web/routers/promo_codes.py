@@ -20,6 +20,7 @@ async def promo_codes_page(request: Request):
         promos = await crud.get_all_promo_codes(session)
     return templates.TemplateResponse(request=request, name="promo_codes.html", context={
         "request": request, "promos": promos, "page": "promo_codes",
+        "admin_path": settings.ADMIN_PATH,
     })
 
 @router.post("/create")

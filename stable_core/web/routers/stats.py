@@ -23,4 +23,5 @@ async def stats_page(request: Request):
     return templates.TemplateResponse(request=request, name="stats.html", context={
         "request": request, "metrics": metrics,
         "daily_stats": daily, "payments": payments, "page": "stats",
+        "admin_path": settings.ADMIN_PATH,
     })

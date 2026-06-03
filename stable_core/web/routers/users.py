@@ -20,4 +20,5 @@ async def users_page(request: Request):
         total = await crud.count_users(session)
     return templates.TemplateResponse(request=request, name="users.html", context={
         "request": request, "users": users, "total": total, "page": "users",
+        "admin_path": settings.ADMIN_PATH,
     })

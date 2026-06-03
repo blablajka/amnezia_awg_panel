@@ -22,4 +22,5 @@ async def subscriptions_page(request: Request):
         subs = list(result.scalars().all())
     return templates.TemplateResponse(request=request, name="subscriptions.html", context={
         "request": request, "subscriptions": subs, "page": "subscriptions",
+        "admin_path": settings.ADMIN_PATH,
     })

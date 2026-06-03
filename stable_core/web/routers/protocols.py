@@ -35,6 +35,7 @@ async def protocols_page(request: Request):
     return templates.TemplateResponse(request=request, name="protocols.html", context={
         "request": request, "servers": server_data,
         "protocols": AVAILABLE_PROTOCOLS, "page": "protocols",
+        "admin_path": settings.ADMIN_PATH,
     })
 
 
