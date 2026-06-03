@@ -135,13 +135,16 @@ if [ "$PHASE" -le 1 ]; then
 
         # Download installer to persistent location
         if [ ! -f "$AWG_INSTALLER_PATH" ]; then
-            curl -fsSL "$AWG_INSTALLER_PATH" -o "$AWG_INSTALLER_PATH" 2>/dev/null || \
+            curl -fsSL "$AWG_INSTALLER_URL" -o "$AWG_INSTALLER_PATH" 2>/dev/null || \
                 wget -qO "$AWG_INSTALLER_PATH" "$AWG_INSTALLER_URL"
             chmod +x "$AWG_INSTALLER_PATH"
         fi
 
-        # Save installer args for resume
-        echo "--yes --port=$AWG_LISTEN_PORT --preset=$AWG_PRESET --route-amnezia --no-tweaks" > "$AWG_INSTALLER_ARGS"
+        # Save installer args for resume (add --force if previous state exists)
+        AWG_EXTRA_ARGS=""
+        [ -f "$AWG_DIR/setup_state" ] && AWG_EXTRA_ARGS="--force"
+        AWG_FULL_ARGS="--yes --port=$AWG_LISTEN_PORT --preset=$AWG_PRESET --route-amnezia --no-tweaks $AWG_EXTRA_ARGS"
+        echo "$AWG_FULL_ARGS" > "$AWG_INSTALLER_ARGS"
 
         # Create resume service (runs after reboot to continue bivlked installer)
         cat > /etc/systemd/system/smart-vpn-awg.service << SVCEOF
@@ -153,7 +156,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash $AWG_INSTALLER_PATH $(cat "$AWG_INSTALLER_ARGS")
+ExecStart=/bin/bash $AWG_INSTALLER_PATH --yes --port=$AWG_LISTEN_PORT --preset=$AWG_PRESET --route-amnezia --no-tweaks --force
 ExecStartPost=/bin/bash $SELF_PATH --resume
 StandardOutput=journal
 StandardError=journal
@@ -171,18 +174,23 @@ SVCEOF
         # Run bivlked installer NOW (it will reboot)
         echo "   Running bivlked installer..."
         bash "$AWG_INSTALLER_PATH" --yes --port="$AWG_LISTEN_PORT" \
-            --preset="$AWG_PRESET" --route-amnezia --no-tweaks 2>&1 | tail -5 || true
+            --preset="$AWG_PRESET" --route-amnezia --no-tweaks $AWG_EXTRA_ARGS 2>&1 | tail -10 || true
 
-        # If we reach here, either install succeeded or needs reboot
+        # Check if bivlked actually needs reboot vs. already done
         if lsmod | grep -q amneziawg && [ -f "$AWG_DIR/server_private.key" ]; then
             echo "   AWG 2.0 installed (no reboot needed, or already done)"
             systemctl disable smart-vpn-awg.service 2>/dev/null || true
-        else
+        elif [ -f "$AWG_DIR/setup_state" ]; then
+            # bivlked needs reboot to continue — let systemd resume it
             echo ""
-            echo "   SERVER REBOOTING — systemd will auto-resume."
+            echo "   SERVER REBOOTING — smart-vpn-awg.service will auto-resume."
             echo "   DO NOT RUN ANYTHING MANUALLY."
             reboot
             exit 0
+        else
+            echo "   ERROR: bivlked installer failed (no state file, no AWG module)"
+            echo "   Check $AWG_DIR/install_amneziawg.log"
+            exit 1
         fi
     else
         echo ""
