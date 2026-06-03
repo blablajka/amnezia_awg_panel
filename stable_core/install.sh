@@ -41,12 +41,20 @@ echo "================================================="
 echo ""
 echo "=> [1/9] Installing system dependencies..."
 apt-get update -qq
+# Try linux-headers-amd64 (meta-pkg), fallback to linux-headers-generic, ignore if missing
+HEADERS_OK=0
+apt-get install -y -qq linux-headers-amd64 2>/dev/null && HEADERS_OK=1 || true
+[ "$HEADERS_OK" = "0" ] && apt-get install -y -qq linux-headers-generic 2>/dev/null && HEADERS_OK=1 || true
+
 apt-get install -y -qq \
     git python3 python3-venv python3-pip nginx curl wget jq \
     uuid-runtime ipset iptables iproute2 qrencode \
-    build-essential dkms linux-headers-$(uname -r) \
+    build-essential dkms \
     gawk perl ufw fail2ban \
     software-properties-common gpg
+
+# Try headers again with specific kernel version
+[ "$HEADERS_OK" = "0" ] && apt-get install -y -qq linux-headers-$(uname -r) 2>/dev/null || true
 
 echo "   System packages: OK"
 
