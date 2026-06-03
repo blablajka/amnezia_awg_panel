@@ -46,7 +46,7 @@ async def add_server(
     country_code: str = Form("DK"),
     preset: str = Form("default"),
     awg_listen_port: int = Form(39743),
-    ipv6_enabled: bool = Form(False),
+    ipv6_enabled: bool = Form(True),
 ):
     token = get_session_token(request)
     if not await verify_session(token):

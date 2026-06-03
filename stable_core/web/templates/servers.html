@@ -114,19 +114,6 @@
                             class="w-full px-4 py-2.5 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-dark-100 mb-1">Country</label>
-                        <select name="country_code"
-                            class="w-full px-4 py-2.5 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm">
-                            <option value="RU" selected>🇷🇺 Russia (Entry)</option>
-                            <option value="DK">🇩🇰 Denmark (Exit)</option>
-                            <option value="NL">🇳🇱 Netherlands</option>
-                            <option value="DE">🇩🇪 Germany</option>
-                            <option value="LT">🇱🇹 Lithuania</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
                         <label class="block text-xs font-medium text-dark-100 mb-1">AWG Preset</label>
                         <select name="preset"
                             class="w-full px-4 py-2.5 bg-dark-700/50 border border-dark-400/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm">
@@ -134,13 +121,9 @@
                             <option value="mobile">Mobile (Tele2/Yota/Megafon)</option>
                         </select>
                     </div>
-                    <div class="flex items-end pb-2">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" name="ipv6_enabled" value="true"
-                                class="w-4 h-4 rounded bg-dark-700 border-dark-400 text-brand-500 focus:ring-brand-500">
-                            <span class="text-xs text-dark-100">Enable IPv6 dual-stack</span>
-                        </label>
-                    </div>
+                    <input type="hidden" name="country_code" value="RU">
+                    <input type="hidden" name="ipv6_enabled" value="true">
+                </div>
                 </div>
                 <button type="submit"
                     class="w-full py-3 bg-gradient-to-r from-brand-500 to-brand-700 text-white font-semibold rounded-xl hover:from-brand-400 hover:to-brand-600 transition-all shadow-lg shadow-brand-500/20 mt-2">
