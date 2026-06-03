@@ -34,6 +34,9 @@ AWG_INSTALLER_ARGS="$AWG_DIR/.awg_installer_args"
 SELF_PATH="$AWG_DIR/smart-vpn-install.sh"
 RESUME_FLAG="${1:-}"
 
+# ANSI colors for readable output
+GREEN='\033[1;32m'; CYAN='\033[1;36m'; YELLOW='\033[1;33m'; RED='\033[1;31m'; NC='\033[0m'
+
 # Cache server IP once
 SERVER_IP=""
 _get_ip() {
@@ -551,13 +554,13 @@ ADMIN_URL="http://${IP}${ADMIN_PATH_SECURE:-/admin}/dashboard"
 
 echo ""
 echo "================================================="
-echo "  Install Complete!"
+echo -e "  ${GREEN}Install Complete!${NC}"
 echo ""
-echo "  Panel:   $ADMIN_URL"
-echo "  Login:   $ADMIN_USERNAME / $ADMIN_PASSWORD"
-echo "  API Key: $AWG_API_TOKEN"
+echo -e "  ${CYAN}Panel:${NC}   ${YELLOW}$ADMIN_URL${NC}"
+echo -e "  ${CYAN}Login:${NC}   ${GREEN}$ADMIN_USERNAME / $ADMIN_PASSWORD${NC}"
+echo -e "  ${CYAN}API Key:${NC} $AWG_API_TOKEN"
 echo ""
-echo "  Next: Add foreign VPS → Create bridge"
+echo -e "  ${YELLOW}Next:${NC} Add foreign VPS → Create bridge"
 echo "================================================="
 
 cat > "$INSTALL_DIR/CREDENTIALS.txt" << CREDEOF
