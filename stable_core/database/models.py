@@ -197,7 +197,7 @@ class Server(Base):
     # AWG 2.0 obfuscation params (JSON string): Jc, Jmin, Jmax, S1-S4, H1-H4, I1
     awg_params: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     awg_preset: Mapped[Optional[str]] = mapped_column(String(50), default="default", nullable=True)
-    ipv6_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # IPv6 dual-stack in tunnel
+    ipv6_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)  # IPv6 dual-stack (always on)
     ipv6_subnet: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # e.g. fddd:2c4:2c4:2c4::/64
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

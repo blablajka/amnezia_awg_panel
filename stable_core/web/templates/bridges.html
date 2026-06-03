@@ -23,13 +23,13 @@
         <h2 class="text-lg font-semibold text-white mb-4">Создать мост</h2>
         <form action="{{ admin_path }}/bridges/create" method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-3">
             <select name="server_from_id" class="bg-dark-700 border border-dark-400/30 rounded-lg px-3 py-2 text-sm text-white" required>
-                <option value="">От (русский VPS)...</option>
+                <option value="" disabled selected>От (русский VPS)...</option>
                 {% for s in servers %}
                 <option value="{{ s.id }}">{{ s.country_flag }} {{ s.name }} ({{ s.host }})</option>
                 {% endfor %}
             </select>
             <select name="server_to_id" class="bg-dark-700 border border-dark-400/30 rounded-lg px-3 py-2 text-sm text-white" required>
-                <option value="">К (зарубежный VPS)...</option>
+                <option value="" disabled selected>К (зарубежный VPS)...</option>
                 {% for s in servers %}
                 <option value="{{ s.id }}">{{ s.country_flag }} {{ s.name }} ({{ s.host }})</option>
                 {% endfor %}
