@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     PRICE_3_MONTHS: int = 690
     PRICE_12_MONTHS: int = 2490
 
+    # ── YooKassa (test mode) ────────────────────────────────────────────────
+    YOOKASSA_SHOP_ID: str = ""
+    YOOKASSA_SECRET_KEY: str = ""
+
     @property
     def prices(self) -> dict[str, int]:
         """Plan prices in RUB."""

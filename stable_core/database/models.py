@@ -313,7 +313,7 @@ class Payment(Base):
     )
 
     # ── Relationships ────────────────────────────────────────────────
-    user: Mapped[User] = relationship(back_populates="payments")
+    user: Mapped[User] = relationship(back_populates="payments", lazy="selectin")
     subscription: Mapped[Optional[Subscription]] = relationship(back_populates="payments", lazy="selectin")
     promo_code: Mapped[Optional[PromoCode]] = relationship(back_populates="payments", lazy="selectin")
 

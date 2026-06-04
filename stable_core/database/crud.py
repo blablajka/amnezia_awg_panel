@@ -420,7 +420,7 @@ async def get_active_bridges(session: AsyncSession) -> list[Bridge]:
 
 async def create_bridge(
     session: AsyncSession, server_from_id: int, server_to_id: int,
-    protocol: str = "gost", config_data: str | None = None,
+    protocol: str = "awg", config_data: str | None = None,
 ) -> Bridge:
     bridge = Bridge(
         server_from_id=server_from_id, server_to_id=server_to_id,
