@@ -47,7 +47,7 @@ def _save_sessions() -> None:
         SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
         tmp = SESSIONS_FILE.with_suffix(".tmp")
         tmp.write_text(json.dumps(_sessions))
-        tmp.rename(SESSIONS_FILE)
+        tmp.replace(SESSIONS_FILE)
     except Exception:
         pass  # Non-critical — sessions survive in memory
 

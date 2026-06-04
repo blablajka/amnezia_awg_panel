@@ -4,6 +4,7 @@ Dashboard Router — main admin page with live metrics and server status.
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from fastapi import APIRouter, Request
 from config import settings
@@ -14,6 +15,7 @@ from services.stats_service import StatsService
 from services.server_manager import ServerManager
 from web.auth import get_session_token, verify_session
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
@@ -37,7 +39,8 @@ async def dashboard_page(request: Request):
     for s in servers:
         try:
             status = await asyncio.wait_for(sm.get_server_status(s), timeout=5.0)
-        except Exception:
+        except Exception as _e:
+            logger.debug("Health check %s: %s", s.name, _e)
             status = {"status": "offline", "peers": 0}
         server_statuses.append({"server": s, "status": status})
 

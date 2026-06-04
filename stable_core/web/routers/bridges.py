@@ -100,9 +100,15 @@ async def delete_bridge(request: Request, bridge_id: int = Form(...)):
     if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
 
-    async with async_session_factory() as session:
-        await crud.delete_bridge(session, bridge_id)
-        await session.commit()
+    try:
+        async with async_session_factory() as session:
+            deleted = await crud.delete_bridge(session, bridge_id)
+            await session.commit()
+            if not deleted:
+                return RedirectResponse(f"{settings.ADMIN_PATH}/bridges?error=not_found", status_code=302)
+    except Exception as e:
+        logger.error("Bridge delete failed: %s", e)
+        return RedirectResponse(f"{settings.ADMIN_PATH}/bridges?error=delete_failed", status_code=302)
 
     return RedirectResponse(f"{settings.ADMIN_PATH}/bridges?deleted=1", status_code=302)
 
@@ -113,10 +119,17 @@ async def toggle_bridge(request: Request, bridge_id: int = Form(...)):
     if not await verify_session(token):
         return RedirectResponse(f"{settings.ADMIN_PATH}/login", status_code=302)
 
-    async with async_session_factory() as session:
-        bridge = await crud.get_bridge_by_id(session, bridge_id)
-        if bridge:
-            await crud.update_bridge_status(session, bridge_id, not bridge.is_active)
-            await session.commit()
+    try:
+        async with async_session_factory() as session:
+            bridge = await crud.get_bridge_by_id(session, bridge_id)
+            if bridge:
+                await crud.update_bridge_status(session, bridge_id, not bridge.is_active)
+                await session.commit()
+                logger.info("Bridge %d toggled to %s", bridge_id, not bridge.is_active)
+            else:
+                return RedirectResponse(f"{settings.ADMIN_PATH}/bridges?error=not_found", status_code=302)
+    except Exception as e:
+        logger.error("Bridge toggle failed: %s", e)
+        return RedirectResponse(f"{settings.ADMIN_PATH}/bridges?error=toggle_failed", status_code=302)
 
     return RedirectResponse(f"{settings.ADMIN_PATH}/bridges?toggled=1", status_code=302)
